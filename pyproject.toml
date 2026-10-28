@@ -1,0 +1,71 @@
+[build-system]
+requires = ["hatchling>=1.24,<2"]
+build-backend = "hatchling.build"
+
+[project]
+# Distribution and import names are provisional (decision D-02); availability on
+# PyPI has not been verified.
+name = "sentinel-ai"
+dynamic = ["version"]
+description = "Runtime security layer between AI agents and the tools they invoke (pre-alpha scaffold: no security functionality implemented yet)."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Soham Pasalkar" }]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    # Blocks accidental uploads to PyPI until the name is verified (D-02).
+    "Private :: Do Not Upload",
+]
+dependencies = []
+
+[project.optional-dependencies]
+# Exact verified versions are pinned in constraints-dev.txt.
+dev = [
+    "pytest>=9.2,<10",
+    "ruff>=0.17,<0.18",
+]
+
+[tool.hatch.version]
+path = "src/sentinel/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sentinel"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/sentinel", "tests", "README.md", "pyproject.toml"]
+
+[tool.pytest.ini_options]
+minversion = "9.2"
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+xfail_strict = true
+
+[tool.ruff]
+target-version = "py311"
+src = ["src", "tests"]
+# Ruff also formats code blocks inside Markdown. The build brief and the design
+# documents are reference material and must not be rewritten by tooling.
+extend-exclude = ["SENTINEL_BUILD_BRIEF.md", "docs"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "S",   # flake8-bandit (security)
+    "D",   # pydocstyle (NFR-008: public API docstrings)
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "D"]

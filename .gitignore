@@ -1,0 +1,28 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtual environments (project and spike environments)
+.venv/
+spikes/**/.venv/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Secrets and local configuration
+.env
+
+# Audit databases (never commit)
+*.db
+*.db-wal
+*.db-shm

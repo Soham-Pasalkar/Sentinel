@@ -1,0 +1,9 @@
+# Exact development-tool versions verified for the C-01 scaffold.
+# Generated with `pip freeze --exclude-editable` in a Python 3.11 project venv.
+# Use: python -m pip install -e ".[dev]" -c constraints-dev.txt
+iniconfig==2.3.1
+packaging==26.3
+pluggy==1.7.0
+Pygments==2.21.0
+pytest==9.2.0
+ruff==0.17.3
