@@ -1,9 +1,16 @@
-# Exact development-tool versions verified for the C-01 scaffold.
+# Exact versions verified for the project environment.
 # Generated with `pip freeze --exclude-editable` in a Python 3.11 project venv.
 # Use: python -m pip install -e ".[dev]" -c constraints-dev.txt
+# Runtime: pydantic (decision NFR-002 Pydantic part, approved 2026-10-28) and its
+# required dependencies. Dev tools: pytest, ruff and their dependencies (C-01).
+annotated-types==0.8.0
 iniconfig==2.3.1
 packaging==26.3
 pluggy==1.7.0
+pydantic==2.14.1
+pydantic_core==2.50.1
 Pygments==2.21.0
 pytest==9.2.0
 ruff==0.17.3
+typing-inspection==0.4.4
+typing_extensions==4.16.0

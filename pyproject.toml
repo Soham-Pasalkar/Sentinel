@@ -21,7 +21,7 @@ classifiers = [
     # Blocks accidental uploads to PyPI until the name is verified (D-02).
     "Private :: Do Not Upload",
 ]
-dependencies = []
+dependencies = ["pydantic>=2.14,<3"]
 
 [project.optional-dependencies]
 # Exact verified versions are pinned in constraints-dev.txt.

@@ -11,7 +11,7 @@ At this stage the repository holds only the package scaffold, development toolin
 | Component | Status |
 |---|---|
 | Package scaffold, tests, lint, CI (increment C-01) | implemented |
-| Core models and contracts | not started |
+| Core models and contracts | implemented (internal, not exported): action record and digest (C-03a), models and exceptions (C-03) |
 | Request validation (gateway) | not started |
 | Identity and capability grants | not started |
 | Filesystem path authorization | not started |
@@ -21,13 +21,13 @@ At this stage the repository holds only the package scaffold, development toolin
 | Pipeline and public client API | not started |
 | Threat detection (heuristic) | not started |
 | Output filtering | not started |
-| Framework integrations (LangGraph, LangChain) | not started; feasibility not yet tested |
+| Framework integrations (LangGraph, LangChain) | not started; feasibility experiments done (C-02, C-02b), adapter design approved (D-12) |
 
 The only public attribute today is `sentinel.__version__`.
 
 ## Planned design (not implemented)
 
-The planned v1 is a synchronous, in-process pipeline:
+The planned v1 is an in-process pipeline (synchronous core, plus a narrow async entry for async-native tools):
 
 **request validation → agent identity and grants → heuristic detection → deterministic policy decision → controlled tool execution → output filtering**
 
