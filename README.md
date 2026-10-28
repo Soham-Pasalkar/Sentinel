@@ -45,7 +45,7 @@ The full list is in the decision register.
 
 ## Requirements
 
-- Python 3.11 or newer (CI tests 3.11, 3.12 and 3.13).
+- Python 3.11 or newer. CI is configured to test 3.11, 3.12 and 3.13; it has not yet run on GitHub.
 
 ## Local development setup
 
@@ -68,7 +68,7 @@ ruff check .               # lint
 ruff format --check .      # formatting check (use `ruff format .` to apply)
 ```
 
-The same commands run in GitHub Actions (`.github/workflows/ci.yml`) on every push to `main` and on every pull request.
+The same commands are configured to run in GitHub Actions (`.github/workflows/ci.yml`) on every push to `main` and on every pull request. The workflow has not yet run remotely, so it is unverified.
 
 ## Package name
 
