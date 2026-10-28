@@ -1,10 +1,10 @@
-# Implementation Plan — Sentinel v1 Construction (rev. 2)
+# Implementation Plan — Sentinel v1 Construction (rev. 7)
 
 | | |
 |---|---|
-| Phase | Inception, revised in Phase 1.5 (plan only; **nothing is implemented**) |
+| Phase | Inception, revised in Phase 1.5 and after the C-02/C-02b review (rev. 3). Implemented so far: **C-01 only** (scaffold, commit `8a5a993`). C-02/C-02b were throwaway experiments |
 | Date | 2026-10-28 |
-| Status | Draft rev. 2 — pending owner review. Contracts and decisions: [`decision_record.md`](decision_record.md) |
+| Status | Draft rev. 7 — pending owner review. C-03 approved by the owner but **blocked on the Pydantic dependency** (no C-03 code written). **C-03a authorized and implemented (uncommitted); full C-03 not authorized** (gate: `decision_record.md` §8.6, rev. 4 update). Contracts and decisions: [`decision_record.md`](decision_record.md) |
 
 ## 1. Shape of the plan
 
@@ -19,6 +19,16 @@
   - C-10 adds digest verification and re-resolution.
   - C-16 implements `wrap_tools`, not `protect`.
   - Every increment lists the decisions that must be **Approved** before it starts.
+- **Rev. 3 changes (after the owner approved D-12, D-25–D-28 and the D-14 amendment):**
+  - C-02 and the new C-02b are recorded as **done**.
+  - C-03 adds the optional `tool_call_id` field (D-31) and the in-process `unknown` semantics.
+  - C-05 registers sync and/or async callables.
+  - C-09 records interruption and diagnostics (D-29).
+  - C-10 adds the atomic single-use claim (D-25), the `tool_call_id` guard (D-27), the async execution path and the interruption state machine.
+  - C-11 adds the async entry (D-30) and best-effort `unknown` records.
+  - C-16 becomes the Design B adapter for sync, async-native and `Command` tools, with `ToolNode` and `create_agent` as callers.
+  - C-17 is folded into C-16 (`create_agent` is in D-12 scope).
+  - Production acceptance tests AT-01–AT-27 (`testing_strategy.md` §15) are assigned to increments.
 - No placeholder modules: each module is created by the increment that implements it.
 
 ## 2. Gate G-0 — Construction entry (from `decision_record.md` §8)
@@ -36,7 +46,13 @@
 
 **May stay provisional at C-01:** D-10, D-12, D-17, D-19 (M3 mode), D-20 (final form), D-21 (CI OS matrix adjustable), D-24 items not used by C-01.
 
-**Security contracts that must be Approved before the increment that encodes them** (see "Blocked by" in each increment): C-03 ← D-03, D-04, D-06, D-07, D-08, D-14, D-15, D-24c, D-24d; C-04 ← D-05, D-18, D-21; C-09 ← D-09, D-11, D-24f; C-11 ← D-16, D-20. **Implementing first and deciding later is not permitted** for these.
+**Security contracts that must be Approved before the increment that encodes them** (see "Blocked by" in each increment). Rev. 3 list, updated in rev. 4 (D-07, D-29, D-30, D-31 now Approved):
+- C-03 ← D-03, D-04, D-06, D-08, D-14 (remainder), D-15, D-24c, D-24d, **D-24i** (added in rev. 4; D-24b too if `ToolGrant` stays in C-03). Authoritative checklist: `decision_record.md` §8.6;
+- C-04 ← D-05, D-18, D-21;
+- C-09 ← D-09, D-11, D-24f (D-29 Approved);
+- C-10 ← D-14, D-19, **D-31 default values** (TTL, capacity) (D-07, D-25, D-27, D-31 Approved);
+- C-11 ← D-16, D-20 (D-30 Approved: internal entry);
+- C-16 ← D-04 (D-12, D-26, D-30, D-31 and FR-022 Approved). **Implementing first and deciding later is not permitted** for these.
 
 ## 3. Increments
 
@@ -53,7 +69,7 @@
   - Dev tools are pytest and Ruff only (D-22 partly approved). mypy is **not** configured.
   - No `.env.example`, since nothing reads configuration yet.
   - `constraints-dev.txt` was added for reproducible tool versions.
-  - Ruff excludes `SENTINEL_BUILD_BRIEF.md` and `docs/`, because Ruff 0.17 formats Markdown code blocks and would otherwise propose rewriting the brief.
+  - Ruff excludes `SENTINEL_BUILD_BRIEF.md` and `docs/`, because Ruff 0.17 formats Markdown code blocks and would otherwise propose rewriting the brief. *(Rev. 3: `spikes` added to the same `extend-exclude` list under D-28; the file-wide `# ruff: noqa` headers in spike files were removed.)*
   - CI runs on `ubuntu-latest` only (D-21 still Proposed).
   - Because mypy is not approved, the `mypy src` acceptance item above does not apply to C-01.
   - **Status: complete locally.** Committed as `8a5a993` on branch `c01-project-scaffold`. Local checks pass (pytest, Ruff lint and format, editable install on 3.11, wheel install on 3.12). GitHub Actions has **not** run, so it is unverified. Not pushed.
@@ -67,16 +83,85 @@
 - **Acceptance:** the report has evidence (commands and output, `pip freeze`, Python version) for every experiment, a recommended adapter design, and stated impacts on D-04, D-12 and D-20.
 - **Stop condition:** if E1 or E2 fails, stop and escalate to the owner before C-03.
 - **Evidence:** the report. The owner then sets D-12 status.
+- **Rev. 3 status: done (2026-10-28).** Report `docs/aidlc/02-construction/spike_framework_interception.md`; 97 checks against stand-ins; E1/E2 passed; Design B recommended. Evidence kept in `spikes/langgraph_interception/`.
+
+### C-02b — LangChain `create_agent`, async-native and `Command` compatibility experiment (isolated, throwaway)
+- **Status: done (2026-10-28).** Report `docs/aidlc/02-construction/spike_langchain_compatibility.md`; 120 checks against stand-ins; evidence in `spikes/langchain_compatibility/`. Its findings produced the owner approvals D-12 (expanded), D-14 amendment, D-25, D-26, D-27 and D-28.
 
 ### C-03 — Exceptions and core models / contracts
 - **Objective:** encode C1 in types.
-- **Scope:** `exceptions.py` (FR-018); `models.py`: `Decision` (lowercase values), `Severity`, `SecurityRequest` (frozen, `SecretStr`), `ToolGrant`, `RateLimit`, `CapabilityEnvelope`, `SecurityContext`, `SecurityFinding`, `ToolSpec` (metadata only), `AuthorizedAction` (with digest function), `SecurityDecision` (with `action`), `PipelineResult` (C1.6 fields), reason and error code constants.
-- **Dependencies:** C-01; C-02 report reviewed.
-- **Blocked by:** D-03, D-04, D-06, D-07, D-08, D-14, D-15, D-24c, D-24d.
-- **Acceptance:** model validation; frozen models reject attribute assignment; the digest is stable across runs and differs for any change in a nested argument; `SecretStr` is absent from `repr` and JSON; enum ordering.
-- **Tests:** `unit/test_models.py`, `unit/test_action_digest.py`, `unit/test_exceptions.py`.
-- **Security invariants:** SEC-008 (models); digest sensitivity (basis for SEC-021).
-- **Evidence:** pytest and mypy output.
+- **Entry gate (rev. 4):** `decision_record.md` §8.6. *Rev. 4 open list:* D-03, D-04, D-06, D-08, D-14 (remainder), D-15, D-24c, D-24d, D-24i (and D-24b if `ToolGrant` stays here).
+- **Rev. 5:** D-03, D-04, D-06, D-08, D-14, D-24c, D-24d are Approved; D-24i is Approved for lowercase values. **Full C-03 remains NOT AUTHORIZED** (owner). Remaining blockers before it can be requested: **Q-03c**; D-24b only if `ToolGrant` stays in C-03. The D-15 remainder affects C-08, not C-03 models. C-03 builds on the C-03a module rather than re-implementing it.
+- **Scope (unchanged in intent; exact content fixed by the open decisions):**
+  - `exceptions.py` (FR-018; per D-03, D-24d);
+  - `models.py`:
+    - `Decision` (values per D-24i), `Severity` (per D-24c);
+    - `SecurityRequest` (frozen; `SecretStr` per D-04; optional adapter-supplied `tool_call_id`; a `tool_call_id` without a `session_id` is rejected, D-31);
+    - `SecurityFinding`. *(Rev. 7: `ToolGrant`, `RateLimit`, `CapabilityEnvelope`, `SecurityContext` moved to C-07 per the owner's `ToolGrant` exclusion.)*
+    - `ToolSpec` (metadata only, per D-06, D-08, D-15);
+    - `AuthorizedAction` and `SecurityDecision` (D-07, Approved);
+    - `PipelineResult` (per D-14, D-03);
+  - reason and error-code constants: `INVALID_REQUEST`, `ACTION_MISMATCH`, `DECISION_ALREADY_USED`, `DUPLICATE_TOOL_CALL`, `GUARD_CAPACITY_EXHAUSTED`, `AUDIT_UNAVAILABLE`, `INTERNAL_ERROR`, …
+  - **Rev. 6 (Q-03c):**
+    - `PipelineResult.decision: Decision | None` (`None` only for internal errors);
+    - `Decision` values stay `allow`/`deny`/`require_approval`;
+    - a distinct `SentinelError` subclass for internal errors (never `ActionDenied`).
+
+    Acceptance adds **AT-40 (model part), AT-41**.
+- **Approved contract C-03 must implement (rev. 4):** C1.4 rule 6 (D-07):
+  - canonical JSON (`sort_keys=True`, `separators=(",", ":")`, `ensure_ascii=False`, `allow_nan=False`, UTF-8);
+  - SHA-256 over `request_id`, `agent_id`, tool name and canonical arguments (including resolved paths);
+  - only JSON-native values accepted;
+  - `tool_call_id` excluded.
+- **Dependencies:** C-01; C-02 and C-02b reports reviewed (done).
+- **Rev. 7 (2026-10-28):**
+  - **Owner approval: given** for the C-03 model and exception increment.
+  - **`ToolGrant` out of scope** until D-24b is resolved. Exclusion analysis: clean, but it takes `RateLimit`, `CapabilityEnvelope` and `SecurityContext` with it, since they depend on `ToolGrant` and nothing else in C-03 depends on them. These four move to **C-07**.
+  - Result semantics now include the owner's operational-refusal table (decision record C1.6 rev. 6). Acceptance adds **AT-44 (model part), AT-46**.
+  - **❌ Blocked:** the approved contract requires **Pydantic v2** (C1.3 `arg_schema` as a Pydantic model class; D-08 strict mode; `SecretStr`; brief §2 [DOC]). It is not installed and not declared, adding it is NFR-002 (Proposed), and this task prohibits installs.
+  - **Unblocks with:** owner option A (approve `pydantic>=2.14,<3` as a runtime dependency, pin it, authorize installing it into the project `.venv`) or option B (a stdlib-only contract change). See decision record §8.6 rev. 6.
+- **Rev. 8 status: implemented locally, not committed (2026-10-28).**
+  - Pydantic approved and installed (2.14.1).
+  - Code: `src/sentinel/exceptions.py`, `src/sentinel/models.py`; C-03a `ActionEncodingError` re-parented.
+  - Tests: `tests/unit/test_models.py`, `tests/unit/test_exceptions.py`.
+  - Evidence: `pytest` 137 passed; `ruff check .` clean; `ruff format --check .` clean.
+- *Rev. 7:* **Blocked by:** the Pydantic dependency decision and installation (resolved). *(Rev. 6 list: the owner's explicit gate approval, now given; D-24b, now excluded.)*
+- *Superseded (rev. 6):* the owner's explicit review and approval of the full implementation gate; D-24b (conditional). *(Rev. 5 list also had Q-03c, resolved in rev. 6.)* *(Rev. 4 list: D-03, D-04, D-06, D-08, D-14 (remainder), D-15, D-24c, D-24d, D-24i.)*
+- **Acceptance:**
+  - model validation;
+  - frozen models reject attribute assignment;
+  - `SecretStr` is absent from `repr` and JSON; enum ordering;
+  - `tool_call_id` inside `arguments` → `INVALID_REQUEST` (reserved key, subject to the Q-04b outcome);
+  - **AT-28** (digest identical across processes and hash seeds), **AT-29** (nested changes alter the digest), **AT-30** (`tool_call_id` excluded), **AT-31** (non-JSON-native values rejected), **AT-36** (`tool_call_id` without `session_id` rejected).
+- **Tests:** `unit/test_models.py`, `unit/test_action_digest.py` (including a subprocess-based determinism test), `unit/test_exceptions.py`.
+- **Security invariants:** SEC-008 (models); SEC-032 (digest); basis for SEC-010 and SEC-021.
+- **Evidence:** pytest and Ruff output (mypy only if D-22 is extended).
+
+### C-03a — Action identity and digest — **AUTHORIZED (rev. 5)**
+- **Authorization:** owner, 2026-10-28 ("The owner has authorized a narrow C-03a increment only. Full C-03 remains unauthorized."). Recorded in decision record §12.
+- **Scope as authorized (narrower than the rev. 4 proposal):**
+  - the frozen action record;
+  - canonical action encoding and the stable action digest;
+  - tests for encoding, digest stability, nested argument changes and rejection of unsupported values.
+
+  *Rev. 4 also listed reason-code constants; they are **not** in the authorized scope and stay in C-03.*
+- **Contracts used:** D-07 (incl. tool identity = registered name), D-25, D-27, D-31 (`tool_call_id` excluded from the digest; its guard role is untouched and lives in C-10).
+- **Prohibited (unchanged):** full C-03 models and exceptions, result models, public API changes, credentials, policy, execution, adapters, new dependencies.
+- **Implementation (done 2026-10-28):** `src/sentinel/action.py` (stdlib only):
+  - `canonical_json`, `action_digest`, the immutable `AuthorizedAction`;
+  - an interim `ActionEncodingError(ValueError)`, to be integrated into the exception hierarchy by C-03.
+  - It is **internal**: not exported from `sentinel`; `sentinel.__all__` is unchanged.
+- **Implementation choices made within the contracts (no new rules):**
+  - exact-type checks, so subclasses of the accepted types (e.g. `IntEnum`, `str` subclasses) are rejected;
+  - cycles, lone surrogates, integers beyond Python's digit limit and over-deep nesting are rejected as unencodable;
+  - identifiers must be non-empty `str` (FR-001);
+  - arguments are stored in canonical form and decoded fresh on each read (deep immutability);
+  - `repr` omits argument values (SEC-008);
+  - error messages never contain the rejected values.
+- **Tests:** `tests/unit/test_action.py`, 52 tests covering AT-28, AT-29, AT-30 (model part), AT-31 (model part).
+- **Evidence (2026-10-28, project `.venv`, Python 3.11.14):** `pytest`: 55 passed (52 new + 3 scaffold); `ruff check .`: all checks passed; `ruff format --check .`: 5 files already formatted.
+- **Status: complete locally; not committed** (the owner asked for no commit).
+- **Not covered by C-03a:** the gateway mapping of `ActionEncodingError` to `INVALID_REQUEST` (C-06); reserved-key rejection (C-06); `SecurityDecision`, the proxy's digest re-check and replay protection (C-10); the guard (C-10).
 
 ### C-04 — Path guard (canonicalisation and pure containment)
 - **Objective:** C2 as two functions: `canonicalise(path) -> str` (I/O, used by the gateway and the proxy) and `is_contained(canonical, prefixes) -> bool` (pure, used by policy and the proxy).
@@ -88,7 +173,7 @@
 - **Evidence:** pytest output from both OSes.
 
 ### C-05 — Tool registry
-- **Scope:** `registry.py`: register (unique; `arg_schema` and `destructive` required; `path_args` ⊆ schema `str` fields; refuses path tools on Windows), lookup of `(ToolSpec, callable)`, read-only spec listing.
+- **Scope:** `registry.py`: register (unique; `arg_schema` and `destructive` required; `path_args` ⊆ schema `str` fields; refuses path tools on Windows), lookup of `(ToolSpec, callable)`, read-only spec listing. **Rev. 3:** a registration holds a sync callable, an async callable, or both, and the registry reports which entry points a tool supports.
 - **Dependencies:** C-03. **Blocked by:** D-06, D-08, D-21.
 - **Acceptance:** duplicate, missing-flag, missing-schema and bad-`path_args` registrations raise `RegistrationError`.
 - **Tests:** `unit/test_registry.py`. **Invariants:** SEC-014. **Evidence:** pytest output.
@@ -96,11 +181,12 @@
 ### C-06 — Gateway: validation, strict arguments, canonicalisation
 - **Objective:** raw dict → frozen `SecurityRequest` plus the `AuthorizedAction` candidate.
 - **Scope:** `gateway.py`: shape validation; tool registered; reserved keys; strict `arg_schema` validation (extra forbidden); path arguments validated (C2.3) and canonicalised (C2.4); sanitised error rendering (no input values).
-- **Dependencies:** C-03, C-04, C-05. **Blocked by:** D-04 (reserved keys), D-08, D-18.
+- **Dependencies:** C-03, C-04, C-05. **Blocked by:** D-04 (reserved keys), D-08, D-18. **Rev. 4 acceptance additions:** AT-31 (gateway part: non-JSON-native values → `INVALID_REQUEST`), AT-36 (gateway part).
 - **Acceptance:** FR-001, FR-003, FR-004; relative, `~`, NUL and empty paths → `INVALID_REQUEST`; the canonical path appears in the action; the canary from an invalid field is absent from the error.
 - **Tests:** `unit/test_gateway.py`. **Invariants:** SEC-008 (validation errors), SEC-013 (reserved keys). **Evidence:** pytest output.
 
 ### C-07 — Identity and capability lookup
+- **Rev. 7:** also defines the models moved out of C-03: `ToolGrant` (shape per D-24b, which must be Approved first), `RateLimit`, `CapabilityEnvelope`, `SecurityContext`. **Blocked by D-24b** in addition to D-04 and D-05.
 - **Scope:** `identity.py`: in-memory agent and envelope repositories; `register_agent` support (hash only); `require_credentials`.
 - **Dependencies:** C-03; C-04 (prefix registration helper for grants). **Blocked by:** D-04, D-05.
 - **Acceptance:** FR-005–007; grant with a non-existent prefix → `ConfigurationError`; empty prefixes allowed at registration with a warning.
@@ -113,30 +199,41 @@
 - **Tests:** `unit/test_policy.py`. **Invariants:** SEC-001, SEC-012, SEC-019. **Evidence:** pytest output.
 
 ### C-09 — Audit store and logger
-- **Scope:** `store.py` (`audit_events` table per C4.2, insert and read only, `schema_version` check, WAL + `synchronous=FULL`, default `sentinel_audit.db` resolved at construction); `audit.py` (`AuditLogger.record`, masking, truncation, commit per event, masked `logging` fallback); `reconstruct()` helper implementing C4.4 (also used by tests).
-- **Dependencies:** C-03. **Blocked by:** D-09, D-11, D-20, D-24f.
+- **Scope:** `store.py` (`audit_events` table per C4.2, insert and read only, `schema_version` check, WAL + `synchronous=FULL`, default `sentinel_audit.db` resolved at construction); `audit.py` (`AuditLogger.record`, masking, truncation, commit per event, masked `logging` fallback); `reconstruct()` helper implementing C4.4 (also used by tests). **Rev. 3:** failure diagnostics per D-29 (type, module, stage, location; no message text by default); `REQUEST_COMPLETED(execution="unknown")` support; `reconstruct()` handles `unknown`.
+- **Dependencies:** C-03. **Blocked by:** D-09, D-11, D-20, D-24f, D-29.
 - **Acceptance:** a committed row is visible through a second connection on return; no update/delete; masking and truncation; schema-version mismatch → writes refused; default path created at construction (not import) and logged; `:memory:` → warning; 8-thread inserts consistent.
 - **Tests:** `unit/test_audit_repository.py`, `unit/test_masking.py`, `integration/test_audit_storage_default.py`, `unit/test_reconstruction.py`.
-- **Invariants:** SEC-018, SEC-008 (audit sink), FR-024. **Evidence:** pytest output.
+- **Invariants:** SEC-018, SEC-008 (audit sink), FR-024. **Rev. 3 acceptance:** AT-12 (audit part). **Rev. 4 (D-29 Approved):** structured diagnostics only (type, module, function, line, stage, `request_id`, tool, `error_code`); no message text, traceback text, locals, argument values or absolute paths; no opt-in in v1 → **AT-32, AT-33**. **Evidence:** pytest output.
 
 ### C-10 — Tool proxy with output-filter stage
 - **Scope:** `proxy.py`: binding checks (ALLOW, matching `request_id`s, digest); proxy re-resolution (C2.7); `entered` flag; invoke `fn(**deepcopy(action.arguments))`; tool-error containment; output-filter stage (pass-through) with fail-closed handling. Returns a `ToolResult`-level outcome the pipeline maps to C1.6.
-- **Dependencies:** C-03, C-04, C-05, C-08. **Blocked by:** D-07, D-14, D-19 (failure rule).
-- **Acceptance:** NI-08, NI-09, NI-13; F14, F16; tool error → `failed` with no message; filter error → withheld.
-- **Tests:** `unit/test_proxy.py`, `security/test_action_integrity.py`, `integration/test_proxy_filesystem.py`.
-- **Invariants:** SEC-002, SEC-003, SEC-010, SEC-011, SEC-017, SEC-021. **Evidence:** pytest output.
+- **Rev. 3 scope additions:**
+  - **atomic single-use claim** shared by sync and async paths (D-25);
+  - **`(agent_id, session_id, tool_call_id)` guard** claimed after ALLOW and before EXECUTION_STARTED (D-27, D-31 Approved). **Rev. 4:**
+    - in-flight entries never expire; TTL starts at the terminal state;
+    - deterministic purge before each claim, with an injectable monotonic clock;
+    - **no eviction of unexpired entries**; full → `decision=None`, `GUARD_CAPACITY_EXHAUSTED` (rev. 7; was DENY);
+    - default TTL and capacity must be Approved before C-10 starts;
+  - **async execution path** awaiting the original coroutine;
+  - state machine `claimed → entered → completed | failed | interrupted`;
+  - `BaseException` after `entered` → `interrupted`, re-raised;
+  - forwarding of `InjectedToolCallId` outside the evaluated action.
+- **Dependencies:** C-03, C-04, C-05, C-08. **Blocked by:** D-14 (remainder), D-19 (failure rule), D-31 default values (D-07 and D-31 Approved in rev. 4).
+- **Acceptance:** NI-08, NI-09, NI-13; F14, F16; tool error → `failed` with no message; filter error → withheld. **Rev. 3:** NI-16; AT-01, AT-02, AT-03 (including the non-atomic test double that must fail), AT-06, AT-07, AT-22, AT-23, AT-25 (proxy part), AT-26 (capacity fails closed, no eviction), **AT-30 (guard part), AT-35** (rev. 4).
+- **Tests:** `unit/test_proxy.py`, `security/test_action_integrity.py`, `integration/test_proxy_filesystem.py`, **`security/test_claim_concurrency.py`, `unit/test_tool_call_guard.py`** (rev. 3).
+- **Invariants:** SEC-002, SEC-003, SEC-010, SEC-011, SEC-017, SEC-021, **SEC-024, SEC-025**. **Evidence:** pytest output, including repeated runs of the concurrency tests.
 
 ### C-11 — Pipeline orchestration
-- **Scope:** `pipeline.py` (sole orchestrator and sole audit writer, C4.3 order, C1.7 behaviour, C1.8 error mapping); `config.py`; `detector.py` stub (`[]`).
-- **Dependencies:** C-06 … C-10. **Blocked by:** D-03, D-16, D-20.
-- **Acceptance:** E2E-01 … E2E-09 at pipeline level; full §6 fault-injection matrix; NI-01 … NI-15; canary test.
+- **Scope:** `pipeline.py` (sole orchestrator and sole audit writer, C4.3 order, C1.7 behaviour, C1.8 error mapping); `config.py`; `detector.py` stub (`[]`). **Rev. 3:** the async entry (FR-026; name and visibility D-30) with blocking stages in a worker thread; interruption handling (best-effort `REQUEST_COMPLETED(unknown)`, re-raise); no re-invocation of a claimed request (C1.7).
+- **Dependencies:** C-06 … C-10. **Blocked by:** D-03, D-16, D-20 (D-30 Approved in rev. 4: the async entry is **internal**, not in any `__all__`; acceptance adds **AT-34**).
+- **Acceptance:** E2E-01 … E2E-09 at pipeline level; full §6 fault-injection matrix; NI-01 … NI-15; canary test. **Rev. 3:** NI-17, NI-18; AT-02 (async path), AT-08, AT-09, AT-10, AT-24 (pipeline part), AT-25. **Rev. 6:** NI-05 (revised), NI-19; AT-40, AT-41, AT-43.
 - **Tests:** `integration/test_audit_ordering.py`, `integration/test_audit_reconstruction.py`, `security/test_fault_injection.py`, `security/test_invariants.py`, `security/test_secret_canary.py`.
 - **Invariants:** SEC-005, SEC-006, SEC-009, SEC-022, SEC-023. **Evidence:** pytest output including the security-suite summary.
 
 ### C-12 — Public client, quickstart, README (closes M1)
 - **Scope:** `client.py` (`SentinelClient`, `register_tool`, `register_agent`, `evaluate_request`, `audit_events`); `__all__` (no proxy); `examples/quickstart.py`; README (status table, limitations from `decision_record.md` §2/§4.6/§6, decisions link).
 - **Dependencies:** C-11. **Blocked by:** D-17, D-24i.
-- **Acceptance:** E2E-01 … E2E-09 through `SentinelClient`; the quickstart exits 0 and its subprocess test passes; `__all__` test.
+- **Acceptance:** E2E-01 … E2E-09 through `SentinelClient`; the quickstart exits 0 and its subprocess test passes; `__all__` test. **Rev. 4:** AT-34 (no public async entry on `SentinelClient`).
 - **Tests:** `e2e/test_client.py`, `e2e/test_quickstart.py`. **Evidence:** pytest, ruff, mypy and coverage outputs; quickstart output.
 
 #### Gate G-M1
@@ -151,11 +248,51 @@ Redaction across nested containers; `redact`/`block`; unsupported types withheld
 ### C-15 — Rate limits (M4)
 Atomic per-agent counters with an injected clock; policy row 5. **Blocked by:** D-20; the cross-agent constraint mechanism (brief §12). **Acceptance:** FR-019 tests.
 
-### C-16 — LangGraph adapter `wrap_tools` (M5)
-Design from the C-02 report; identity bound by parameter; async fails closed; `[langgraph]` extra with a tested version range. **Blocked by:** D-12, D-04. **Acceptance:** FR-021, SEC-013 (adapter), SEC-016; E1/E2/E4 regression tests; example graph.
+### C-16 — Framework adapter `wrap_tools`, Design B (M5) — rev. 3
+- **Scope:** replacement `StructuredTool`s for:
+  - sync function tools;
+  - async-native tools (async entry points);
+  - `Command` tools whose only injected parameter is `InjectedToolCallId`.
+- **Behaviour:**
+  - refusal list at wrap time (SEC-029);
+  - identity bound by parameter;
+  - the hidden `tool_call_id` parameter for the guard;
+  - fixed-text in-tool `ToolException`s for non-ALLOW and post-execution failures (D-26);
+  - ALLOW return values passed through unchanged (SEC-028);
+  - best-effort coverage report (FR-025);
+  - framework packages only in an optional extra with the pinned test baseline (NFR-019).
+- **Module placement** is settled here (proposal: `integrations/langchain.py`).
+- **Callers covered by tests:** LangGraph `ToolNode` (sync and async) and `langchain.agents.create_agent`.
+- *Rev. 2 text:* "Design from the C-02 report; identity bound by parameter; async fails closed; `[langgraph]` extra …". "Async fails closed" is superseded by D-12.
+- **Blocked by:** D-04 (D-12, D-26, D-30, D-31 and FR-022 Approved).
+- **Rev. 4, FR-022 scope (owner-approved, narrowed):** `create_agent` is a MUST **only** for the documented patterns (sync function tools; async-native tools through async entry points; `Command` tools whose only injected parameter is `InjectedToolCallId`), all as tools returned by `wrap_tools`. The docs must not imply support for provider built-in tools, unwrapped tools, middleware-supplied tools or unsupported injected parameters.
+- **Acceptance:** FR-021, FR-022, FR-025, SEC-013 (adapter), SEC-016, SEC-025, SEC-026, SEC-028–SEC-031; **AT-04, AT-05, AT-11–AT-21, AT-24 (framework part), AT-27, AT-37, AT-38, AT-39** (rev. 4: AT-37–AT-39 carry the C-17 obligations); **AT-42** (rev. 6: internal-error text distinct from denial); an example agent.
+- **Evidence:** pytest output of the `integration_framework` job against the pinned baseline.
 
-### C-17 — LangChain wrapping (M5, COULD)
-As C-16 (FR-022).
+### C-17 — LangChain wrapping (M5, COULD) — *folded into C-16 (owner-approved in rev. 4, conditional)*
+*Rev. 2 text:* "As C-16 (FR-022)." *Rev. 3:* folded into C-16.
+
+**Rev. 4 condition check.** The owner approved the fold **only if every C-17 acceptance criterion and test obligation remains explicitly represented**.
+- At rev. 2, C-17 = "As C-16 (FR-022)".
+- C-16's rev. 2 acceptance was "FR-021, SEC-013 (adapter), SEC-016; E1/E2/E4 regression tests; example graph", plus the scope items "identity bound by parameter" and "extra with a tested version range".
+- FR-022's rev. 2 acceptance was "As FR-021": "A scripted (offline) graph: allowed spy = 1, denied spy = 0; all invocation APIs covered or fail closed (E2 as a regression test)".
+
+Each obligation, applied to the LangChain (`create_agent`) path, is now explicit in C-16:
+
+| # | C-17 obligation (applied to LangChain / `create_agent`) | Represented in C-16 by | Status |
+|---|---|---|---|
+| O1 | FR-022 acceptance: scripted offline run, allowed spy = 1, denied spy = 0 | AT-20 (`create_agent` rows), AT-39 | represented |
+| O2 | All invocation APIs covered or fail closed (E2 regression) | **AT-38** (`invoke`, `ainvoke`, `stream`, `astream`, `batch`) | represented (new in rev. 4) |
+| O3 | SEC-013 (adapter): identity bound, model cannot inject it | **AT-37** | represented (new in rev. 4) |
+| O4 | SEC-016 async behaviour | AT-21; AT-38 (sync entry into async-only); AT-20 async rows | represented |
+| O5 | E1 regression (denied → original never entered) | AT-20, AT-14 | represented |
+| O6 | E4 regression (async path; old numbering) | AT-20 async rows; AT-38 `ainvoke`/`astream` | represented |
+| O7 | Example graph | **AT-39** (`create_agent` example) | represented (new in rev. 4) |
+| O8 | Identity bound by parameter (design) | C-16 scope ("identity bound by parameter"); AT-37 | represented |
+| O9 | Framework extra with a tested version range | C-16 scope (optional extra, pinned baseline including `langchain` 1.4.7); NFR-019 | represented |
+| O10 | "Async fails closed" (rev. 2 C-16 scope inherited by C-17) | Superseded by D-12 (owner-approved). Its safety intent, that an async-only tool is never executed via a sync entry, is kept as AT-21 | represented (as superseded intent) |
+
+Condition satisfied; C-17 is retired.
 
 ### C-18 — Documentation, packaging, release readiness
 README final pass; performance measurement (NFR-011); wheel and fresh-venv smoke test; threat-model and security review. **Blocked by:** D-02 verified; owner approval before any publication. **Acceptance:** every MUST requirement traced to passing tests or completed inspections; open decisions closed or explicitly deferred.
@@ -163,7 +300,7 @@ README final pass; performance measurement (NFR-011); wheel and fresh-venv smoke
 ## 4. Dependency graph
 
 ```text
-G-0 → C-01 → C-02 (experiment; stop if E1/E2 fail)
+G-0 → C-01 → C-02 → C-02b (experiments: done)
                 │
                 ▼
               C-03 ─┬─► C-04 ─┬─────────────► C-06 (also needs C-05) ─┐
@@ -171,7 +308,7 @@ G-0 → C-01 → C-02 (experiment; stop if E1/E2 fail)
                     ├─► C-07 (needs C-04) ─► C-08 (needs C-04) ───────┤
                     ├─► C-09 ─────────────────────────────────────────┼─► C-11 ─► C-12 ─► [G-M1]
                     └─► C-10 (needs C-04, C-05, C-08) ────────────────┘
-[G-M1] → C-13 | C-14 | C-15 (any order) → C-16 → C-17 → C-18
+[G-M1] → C-13 | C-14 | C-15 (any order) → C-16 → C-18        (rev. 3: C-02b done; C-17 folded into C-16)
 ```
 
 ## 5. Definition of done (every increment)
@@ -189,3 +326,8 @@ G-0 → C-01 → C-02 (experiment; stop if E1/E2 fail)
 |---|---|
 | 1 | Initial Inception plan |
 | 2 | Phase 1.5: G-0 per decision record §8; per-increment "Blocked by" lists use D-IDs; C-06 depends on C-04 (gateway canonicalisation); C-03 adds `AuthorizedAction` and the C1.6 result; C-09 lifecycle, durable default and reconstruction; C-10 digest and re-resolution; C-16 `wrap_tools`; E2E-09 and NI-13–15 added to gates. Rev. 1's spike questions S1–S7 are superseded by E1–E8 (mapping in `testing_strategy.md` §10) |
+| 3 | After the C-02/C-02b review: C-02 and C-02b done; C-03, C-05, C-09, C-10, C-11 and C-16 updated for D-12, D-14 amendment, D-25–D-27 and D-29–D-31; C-17 folded into C-16; AT-01–AT-27 assigned; Ruff `spikes` exclusion noted (D-28). Rev. 2 text is preserved in git (commit `bde7265`) |
+| 4 | Final contract gate: C-03 entry gate (not yet authorized) with the open decisions listed; optional C-03a (approved-only subset); D-07, D-29, D-30, D-31 reflected in C-03, C-06, C-09, C-10, C-11, C-12; FR-022 narrowed in C-16; C-17 obligations table (O1–O10) with new AT-37–AT-39 |
+| 5 | Owner answers recorded; C-03a authorized (scope narrowed to the owner's list: no reason-code constants) and implemented locally with evidence; C-03 gate updated (full C-03 unauthorized; Q-03c open) |
+| 6 | Q-03c resolved (internal errors → `decision=None`, `INTERNAL_ERROR`; not denials): C-03 scope and blockers, C-11 and C-16 acceptance updated. Full C-03 still requires the owner's explicit gate approval. C-03a unchanged |
+| 7 | Owner: operational refusals are not policy decisions; C-03 approved with `ToolGrant` excluded (four models moved to C-07); C-03 blocked on the Pydantic runtime dependency (options A/B in decision record §8.6); C-10 guard wording |

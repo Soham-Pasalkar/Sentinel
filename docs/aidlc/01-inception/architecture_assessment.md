@@ -5,7 +5,7 @@
 | Phase | Inception |
 | Date | 2026-10-28 |
 | Inputs | Architecture PDF (13 pp.), `SENTINEL_BUILD_BRIEF.md`, the 11 diagrams in `docs/architecture/` |
-| Status | Draft rev. 2 (Phase 1.5). Changes marked **[APPROVAL]** need owner sign-off. Rev. 2 replaces §4 and §8 with the reconciled contracts in [`decision_record.md`](decision_record.md); §1–3 and §5–7 are unchanged from rev. 1 except where noted. CF/OD references map to D-IDs through the table at the top of `open_decisions.md` |
+| Status | Draft rev. 7 (operational refusals are not policy decisions; C-03 approved but blocked on the Pydantic dependency). Rev. 6: Q-03c, internal errors are not denials. Rev. 5: owner answers recorded; C-03a implemented. Rev. 4: final contract gate (D-07, D-29, D-30, D-31 approved). Rev. 3 was after C-02/C-02b (owner approvals D-12, D-25–D-28 and the D-14 amendment). Rev. 3 amends §2 (adapter notes), §4 (claim, guard, interruption, async path), §5, §6 and §8; earlier text is kept and marked. Changes marked **[APPROVAL]** need owner sign-off. Rev. 2 replaces §4 and §8 with the reconciled contracts in [`decision_record.md`](decision_record.md); §1–3 and §5–7 are unchanged from rev. 1 except where noted. CF/OD references map to D-IDs through the table at the top of `open_decisions.md` |
 
 ## 1. Summary verdict
 
@@ -45,6 +45,11 @@ The owner's diagrams of 2026-10-26 differ from the brief on three structural poi
 - The proxy's `ToolResult{executed|blocked|error}` is superseded by the C1.6 fields.
 - The `AuditEvent` model is specified in C4.2.
 
+**Rev. 3 notes (decision record C3.5):**
+- **Proxy:** holds the atomic single-use claim (C1.4 rule 5, D-25) and the `tool_call_id` guard (D-27). It has sync and async execution paths sharing one claim implementation, and the state machine `claimed → entered → completed | failed | interrupted`. It is still the only caller of original functions.
+- **Pipeline:** adds the **internal** async entry (FR-026; D-30 Approved in rev. 4: not a public API in v1) that runs blocking stages in a worker thread, and the interruption handling (C1.6: best-effort `unknown`, re-raise).
+- **Framework adapter** (`integrations/`): builds replacement `StructuredTool`s (Design B, D-12); refuses unsupported patterns; forwards `InjectedToolCallId` outside the evaluated action; converts non-ALLOW and post-execution failures into fixed-text in-tool `ToolException`s (D-26); offers a best-effort coverage report (FR-025). It **owns no authorization logic**: it only translates between the framework and the pipeline.
+
 ## 3. Dependency direction (no cycles)
 
 ```text
@@ -78,20 +83,30 @@ Numbers in brackets are audit events. **Bold** marks the failure behaviour.
 | Step | Stage | Action | On exception / failure |
 |---|---|---|---|
 | 0 | Pipeline | Assign `request_id`, UTC `received_at` | — |
-| 1 | Audit | [REQUEST_RECEIVED], masked | **Not invoked; DENY `AUDIT_UNAVAILABLE`**, `audit_complete=False` |
-| 2 | Gateway | Shape; tool registered; reserved keys; strict `arg_schema` (extra forbidden); path arguments absolute → `realpath` canonicalised → `AuthorizedAction` candidate with digest | Invalid → DENY `INVALID_REQUEST` → step 6. Unexpected → **DENY `INTERNAL_ERROR`** |
-| 3 | Identity | → `SecurityContext`; [IDENTITY_RESOLVED] | **DENY `INTERNAL_ERROR`**; audit failure → **DENY `AUDIT_UNAVAILABLE`** |
+| 1 | Audit | [REQUEST_RECEIVED], masked | **Not invoked; `decision=None`, `AUDIT_UNAVAILABLE`** *(rev. 7; was DENY)*, `audit_complete=False` |
+| 2 | Gateway | Shape; tool registered; reserved keys; strict `arg_schema` (extra forbidden); path arguments absolute → `realpath` canonicalised → `AuthorizedAction` candidate with digest | Invalid → refused: `decision=None`, `INVALID_REQUEST` → REQUEST_COMPLETED, no DECISION event *(rev. 7; was DENY → step 6)*. Unexpected → **Internal error: `decision=None`, `INTERNAL_ERROR`, not executed** *(rev. 6, Q-03c; was DENY `INTERNAL_ERROR`)* |
+| 3 | Identity | → `SecurityContext`; [IDENTITY_RESOLVED] | **Internal error: `decision=None`, `INTERNAL_ERROR`, not executed** *(rev. 6, Q-03c; was DENY `INTERNAL_ERROR`)*; audit failure → **`decision=None`, `AUDIT_UNAVAILABLE`** *(rev. 7; was DENY)* |
 | 4 | Detector | → findings; [FINDING]×n | Same as step 3 |
-| 5 | Policy (pure, no I/O) | `evaluate(request, context, findings, tool_spec)`: rows 1–7 of C1.5; containment by component on canonical paths; embeds the action in the decision | **DENY `INTERNAL_ERROR`** |
-| 6 | Audit | [DECISION] (with `action_digest` for allow) | **Not invoked; DENY `AUDIT_UNAVAILABLE`** |
+| 5 | Policy (pure, no I/O) | `evaluate(request, context, findings, tool_spec)`: rows 1–7 of C1.5; containment by component on canonical paths; embeds the action in the decision | **Internal error: `decision=None`, `INTERNAL_ERROR`, not executed** *(rev. 6, Q-03c; was DENY `INTERNAL_ERROR`)* |
+| 6 | Audit | [DECISION] (with `action_digest` for allow) | **Not invoked; the policy decision is preserved (`allow`/`deny`), `AUDIT_UNAVAILABLE`** *(rev. 7; was DENY)* |
 | 6a | Branch | deny / require_approval → [REQUEST_COMPLETED(not_started)] → return | Audit failure: still not executed; `audit_complete=False` |
-| 7 | Audit | [EXECUTION_STARTED] (ALLOW only) | **Not invoked; DENY `AUDIT_UNAVAILABLE`** |
-| 8 | Proxy | ALLOW and `request_id`s match and digest verifies → re-resolve paths (must be unchanged and contained) → set `entered` → `fn(**deepcopy(action.arguments))` | Check fails → **not invoked**; effective DENY `ACTION_MISMATCH` / `RESTRICTED_PATH` / `INTERNAL_ERROR`. Tool raises → `execution="failed"`, `TOOL_FAILED` (type only) |
+| 6b | Proxy (rev. 3; rev. 4) | **Atomic claim** of the decision (D-25); if a `tool_call_id` is present, purge expired guard entries, then claim `(agent_id, session_id, tool_call_id)` (D-27, D-31) | Already claimed → **not invoked**; `decision=None`, `DECISION_ALREADY_USED` / `DUPLICATE_TOOL_CALL` *(rev. 7; was effective DENY)*. **Rev. 4:** guard full after purging → **not invoked**, `decision=None`, `GUARD_CAPACITY_EXHAUSTED` (no eviction of unexpired entries); REQUEST_COMPLETED(not_started). A `tool_call_id` without a `session_id` was already rejected at step 2 (`INVALID_REQUEST`) |
+| 7 | Audit | [EXECUTION_STARTED] (ALLOW only) | **Not invoked; `allow` preserved, `AUDIT_UNAVAILABLE`** *(rev. 7; was DENY)* |
+| 8 | Proxy | ALLOW and `request_id`s match and digest verifies → re-resolve paths (must be unchanged and contained) → set `entered` → `fn(**deepcopy(action.arguments), **injected)` (sync) or `await coro(...)` (async, on the caller's loop) | Check fails → **not invoked**; `decision=None`, `ACTION_MISMATCH` / `RESTRICTED_PATH` (path changed) *(rev. 7; was effective DENY)*; an unexpected internal error (e.g. registry lookup) → `decision=None`, `INTERNAL_ERROR`, not executed (rev. 6, Q-03c). Tool raises `Exception` → `execution="failed"`, `TOOL_FAILED`, structured diagnostics per D-29 (type, module, function, line, stage; no message text, no absolute paths). **Rev. 3:** `BaseException` after `entered` → state `interrupted`, best-effort REQUEST_COMPLETED(`unknown`), re-raise (never DENY, never retried) |
 | 9 | Output filter | Pass-through (M1) / redact (M3); [OUTPUT_FILTERED] or [OUTPUT_WITHHELD] | Filter raises → **output withheld**, `OUTPUT_FILTER_FAILED` |
 | 10 | Audit | [REQUEST_COMPLETED(execution, effective decision)] | Decision stays as enforced; `execution` truthful; output withheld; `audit_complete=False`; masked `logging` fallback (D-03) |
 | 11 | Pipeline | Return `PipelineResult{request_id, decision, reason, execution, output_released, output, audit_complete, error_code}`; never raises for request outcomes | — |
 
 The precedence follows brief R4, which merges the PDF's two conflicting orders so that DENY always beats REQUIRE_APPROVAL. Audit readers apply the reconstruction rules in `decision_record.md` C4.4. A request with EXECUTION_STARTED but no REQUEST_COMPLETED has **unknown** execution status.
+
+**Rev. 3 additions:**
+- The async entry (FR-026) runs steps 0–7 and 9–11 in a worker thread and awaits step 8's coroutine on the caller's event loop.
+- No step re-invokes the tool for a claimed request (C1.7, D-26).
+- The framework adapter maps the result to the framework:
+  - ALLOW + released output → the original return value, unchanged (`str`, `ToolMessage`, `Command`);
+  - non-ALLOW → `ToolException("blocked: <REASON>")`;
+  - executed but failed, or output withheld → `ToolException("tool failed (execution may have occurred)")`;
+  - interruption → the exception propagates.
 
 *Rev. 1 of this table placed canonicalisation in policy, wrote TOOL_EXECUTED/TOOL_BLOCKED terminal events, and raised `AuditUnavailable`. Those positions are superseded by D-18, D-09 and D-03 respectively.*
 
@@ -128,6 +143,11 @@ The precedence follows brief R4, which merges the PDF's two conflicting orders s
 | Runaway tool execution | No timeouts or resource caps |
 | Symlink swaps between resolution and `open()` | TOCTOU residual (CF-13) |
 | Tamper-proof audit | Append-only through the API only (CF-10) |
+| **Rev. 3:** unwrapped, middleware-supplied and provider built-in tools; trusted code substituting an original tool | Outside the adapter boundary (C3.3, C3.6; observed C-02b A5, A6, A8) |
+| **Rev. 3:** downstream effects of an allowed tool's `Command` (`goto`, state updates) | Applied by the framework after Sentinel's decision (C-02b C2) |
+| **Rev. 3:** a new call with a new `tool_call_id`, including model-driven repeats | A new request, evaluated independently; the D-27 guard only stops repeats of the same id |
+| **Rev. 3:** whether an interrupted tool completed its side effect | Inherently unknown; recorded as `unknown` (C1.6) |
+| **Rev. 3:** retry mechanisms other than `RetryPolicy` and `ToolRetryMiddleware` | Untested (C3.6) |
 
 **Trust assumptions (ASSUMPTION, to be stated in the README):** the developer's application code, the Sentinel configuration, and registered tool implementations are trusted. Agent identity is trusted only if it is bound by application code (CF-12).
 
@@ -141,12 +161,18 @@ The precedence follows brief R4, which merges the PDF's two conflicting orders s
 | B4 | Path string re-interpreted by the tool (`~`, relative path, symlink resolved later) | Possible | Execute with the canonical path; reject relative paths (CF-13) | TOCTOU swap window |
 | B5 | Exception after ALLOW reported as DENY → caller assumes no side effect | Yes (§4.2 "any exception → DENY") | `outcome` field (CF-05) | — |
 | B6 | Audit failure leaves an executed call unrecorded | Possible after execution | CF-09 option B | The side effect itself is not undone |
-| B7 | Async framework path calls the original tool unguarded | Possible at M5 | Async entry fails closed (SEC-016) | — |
+| B7 | Async framework path calls the original tool unguarded | Possible at M5 | *Rev. 2:* async entry fails closed (SEC-016). **Rev. 3:** superseded by D-12. Async-native tools are gated through the async proxy path; a sync entry into an async-only tool is rejected by the framework (C-02b B4) | Untested async patterns |
 | B8 | Model supplies `agent_id` to impersonate another agent | Possible if the adapter reads it from model data | Bind identity at wrap time; reserved keys (CF-12) | Misconfigured integration code |
 | B9 | Tool registered twice; the second registration silently replaces a vetted function | Unspecified | Reject duplicates (SEC-014) | — |
 | B10 | Destructive tool registered without the flag | Default `False` fails open | Required argument (CF-16) | Developer mislabels it |
 | B11 | Grant without path prefixes gives unrestricted filesystem access | `None` default | `None` ⇒ deny for path tools (CF-13) | — |
 | B12 | Nested path in a list or dict argument escapes `path_args` | Possible | v1: only top-level path arguments; documented | Tool authors must comply |
+| B13 (rev. 3) | Framework retry re-runs a tool after a post-execution failure | Observed with a naive adapter (3 executions) | In-tool `ToolException` conversion (D-26); `tool_call_id` guard (D-27); no Sentinel re-invocation (C1.7) | Untested retry mechanisms; new ids |
+| B14 (rev. 3) | Two threads/tasks consume one decision | Possible without an atomic claim (observed with the racy control) | Atomic single-use claim (D-25) | Cross-process (out of scope) |
+| B15 (rev. 3) | Interruption reported as not executed, or as a denial | Possible in a naive design | C1.6 interruption handling; re-raise | Outcome itself unknown |
+| B16 (rev. 3) | Denied `Command` tool still routes or updates state | Not observed with Design B | Never return a `Command` on non-ALLOW (SEC-028) | — |
+| B17 (rev. 3) | Middleware swaps in an original tool, or supplies an unwrapped one | Observed (C-02b A6, A8) | Documented as outside the boundary; coverage report (FR-025) | **Inherent** (trusted code) |
+| B18 (rev. 3) | Framework-injected parameters reach the function unevaluated | Observed for `InjectedState` (C-02 B4) | Refuse all injected parameters except `InjectedToolCallId` (SEC-029) | Untested injection kinds refused by rule, not by test |
 
 ## 7. Duplicated responsibilities, missing contracts, unclear interfaces
 
@@ -182,8 +208,20 @@ Rev. 2. The Inception IDs are kept in brackets for traceability.
 | Filesystem contract C2: gateway canonicalisation, pure containment, proxy re-resolution, empty ⇒ deny, existing prefixes | D-05, D-18 (CF-13) |
 | `destructive` required; approval never executes | D-06 (CF-04, CF-16) |
 | Identity from trusted application code; reserved keys | D-04 (CF-12) |
-| `wrap_tools()` instead of `protect(graph)`; async fails closed | D-12 (CF-18) |
+| `wrap_tools()` instead of `protect(graph)`; async fails closed *(rev. 2; async part superseded in rev. 3, see below)* | D-12 (CF-18) |
 | Pipeline is sole orchestrator and audit writer | D-16 (OD-02) |
 | `audit_events` table only; EXECUTION_STARTED / REQUEST_COMPLETED lifecycle | D-09 (OD-01) |
 | Durable SQLite default | D-11 (OD-07) |
 | `audit_events()` read API | D-17 (OD-04) |
+| **Rev. 3, Approved:** Design B adapter scope and refusals | D-12 |
+| **Rev. 3, Approved:** in-process `unknown` on interruption | D-14 amendment |
+| **Rev. 3, Approved:** atomic single-use claim | D-25 |
+| **Rev. 3, Approved:** post-execution failure handling in the adapter | D-26 |
+| **Rev. 3, Approved:** at-most-once per `tool_call_id` | D-27 |
+| *Rev. 3, Proposed:* diagnostics content; async entry; guard parameters. **Rev. 4: Approved** (D-31 default values still Proposed) | D-29, D-30, D-31 |
+| **Rev. 4, Approved:** exact-action binding, canonical digest | D-07 |
+| *Rev. 4, open (C-03 blockers):* result model, post-execution audit failure, return vs raise, credentials and reserved keys, destructive declaration, validation and schemas, policy authority, precedence, decision value casing (D-03, D-04, D-06, D-08, D-14 remainder, D-15, D-24c, D-24d, D-24i). **Rev. 5:** owner answers recorded. **Approved:** D-03, D-04 (`require_credentials=True`), D-06, D-08, D-14, D-24c, D-24d. **Partly approved:** D-15 (metadata authority), D-24i (lowercase values). **New open item:** Q-03c (pre-invocation unexpected-error representation) | decision record §12, §14.R4 |
+| **Rev. 5:** C-03a implemented: `sentinel/action.py` (internal, not exported) | D-07 |
+| **Rev. 6, Approved:** internal errors represented as `decision=None` + `INTERNAL_ERROR`, never `"deny"`; no `"error"` decision value | Q-03c |
+| **Rev. 7, Approved:** operational refusals (invalid request, mismatch, path changed, already used, duplicate id, guard full) → `decision=None`; pre-execution audit failure keeps a reached policy decision; `deny` only for policy rows 1–5 | owner (§12 rev. 6) |
+| **Rev. 7:** C-03 approved with `ToolGrant`, `RateLimit`, `CapabilityEnvelope`, `SecurityContext` moved to C-07; **blocked** by the unapproved, uninstalled Pydantic dependency | §8.6 rev. 6 |

@@ -4,7 +4,7 @@
 |---|---|
 | Phase | Inception |
 | Date | 2026-10-28 |
-| Status | Draft rev. 2 (Phase 1.5) — pending owner review. **No tests exist yet. Nothing here has been run.** Contracts C1–C4 and decisions D-xx: [`decision_record.md`](decision_record.md) |
+| Status | Draft rev. 7 (operational refusals are not policy decisions; C-03 blocked on Pydantic, no new code); rev. 6 (Q-03c: internal errors distinct from denials; rev. 5 C-03a implemented; rev. 4 final contract gate; rev. 3 after C-02/C-02b) — pending owner review. **Production tests:** the 3 C-01 scaffold tests plus **52 C-03a tests** in `tests/unit/test_action.py` (AT-28–AT-31, model level; all passing locally on 2026-10-28). No other security test below is written. **Spike evidence:** C-02 (97 checks) and C-02b (120 checks) ran against *stand-ins*, not Sentinel code. §15 marks each adapter acceptance test as `SPIKE-RAN`, `NOT-RUN`, and `PROD-TODO`. Contracts C1–C4 and decisions D-xx: [`decision_record.md`](decision_record.md) |
 
 ## 1. Principles
 
@@ -75,7 +75,7 @@ Each row is a parametrised case; expected values follow `architecture_assessment
 | path violation + HIGH finding | `RESTRICTED_PATH` |
 | destructive + HIGH finding | DENY (not REQUIRE_APPROVAL) |
 | destructive + path violation | DENY `RESTRICTED_PATH` |
-| two HIGH findings with different codes | deterministic tie-break (CF-03) |
+| two HIGH findings with different codes | deterministic tie-break (CF-03). **Rev. 5 (D-24c Approved):** reason = the code of the highest-severity finding at or above `deny_at_severity`; equal severities → lexicographically smallest `code` (Unicode code points); input order irrelevant; `finding_codes` sorted by descending severity, then ascending code |
 | CRITICAL with `deny_at_severity=CRITICAL`, plus HIGH | deny with the CRITICAL code |
 | grant with empty `allowed_path_prefixes` for a path tool | DENY `RESTRICTED_PATH` (C2.2, pending D-05) |
 | grant with explicit `("/",)` | ALLOW for any absolute path (C2.2) |
@@ -97,14 +97,14 @@ Built in `tmp_path` with `ws/` as the allowed prefix and `outside/secret.txt`. O
 | F4 | `ws/link → outside/secret.txt` (file symlink) | denied |
 | F5 | `ws/dirlink → outside/` then `ws/dirlink/secret.txt` | denied |
 | F6 | `ws/inner → ws/a.txt` (symlink staying inside) | allowed; receives the resolved target |
-| F7 | relative path `a.txt` | denied `INVALID_REQUEST` (C2.3) |
-| F8 | `""`, `"\x00"`, `"ws/a\x00.txt"` | denied `INVALID_REQUEST` |
+| F7 | relative path `a.txt` | refused, `decision=None`, `INVALID_REQUEST` (C2.3; rev. 7, was "denied") |
+| F8 | `""`, `"\x00"`, `"ws/a\x00.txt"` | refused, `decision=None`, `INVALID_REQUEST` (rev. 7, was "denied") |
 | F9 | `~/.ssh/id_rsa` | denied (relative / outside); never expanded |
 | F10 | non-existent file under `ws` (write tool) | allowed; resolved parent inside `ws` |
 | F11 | non-existent path whose parent is a symlink to outside | denied |
 | F12 | prefix itself is a symlink (`/tmp` → `/private/tmp` style) | correct containment after both sides are canonicalised |
 | F13 | the prefix directory exactly (`ws`) | allowed (C2.5) |
-| F14 | proxy given a forged ALLOW for an escaping path (policy bypassed in the test) | blocked, `execution="not_started"`, `error_code="RESTRICTED_PATH"` or `ACTION_MISMATCH`, spy = 0 |
+| F14 | proxy given a forged ALLOW for an escaping path (policy bypassed in the test) | blocked, `decision=None` (rev. 7), `execution="not_started"`, `error_code="RESTRICTED_PATH"` or `ACTION_MISMATCH`, spy = 0 |
 | F15 | symlink swap between proxy re-resolution and the tool's `open` | `xfail(strict=True)` documenting the residual risk (T-07) |
 | F16 | after policy ALLOW, but before the proxy runs, replace `ws/sub` with a symlink to `outside/` (test hook between stages) | proxy re-resolution differs → not invoked, `RESTRICTED_PATH` (C2.7) |
 | F17 | hard link `ws/hl` → `outside/secret.txt` | **allowed**. A normal passing test `test_limitation_hardlink_not_detected` asserts this, so the documented limitation is proven real and any future fix must update the test deliberately |
@@ -120,16 +120,18 @@ Result fields follow C1.6: `decision` / `reason` / `execution` / `output_release
 
 | Injected failure | decision / reason | execution | output_released | audit_complete | error_code | Spy |
 |---|---|---|---|---|---|---|
-| Audit write: REQUEST_RECEIVED | deny / `AUDIT_UNAVAILABLE` | not_started | F | F | `AUDIT_UNAVAILABLE` | 0 |
-| Gateway raises unexpectedly | deny / `INTERNAL_ERROR` | not_started | F | T | — | 0 |
-| Identity raises | deny / `INTERNAL_ERROR` | not_started | F | T | — | 0 |
-| Detector raises | deny / `INTERNAL_ERROR` | not_started | F | T | — | 0 |
-| Policy raises | deny / `INTERNAL_ERROR` | not_started | F | T | — | 0 |
-| Audit write: IDENTITY_RESOLVED / FINDING / DECISION | deny / `AUDIT_UNAVAILABLE` | not_started | F | F | `AUDIT_UNAVAILABLE` | 0 |
-| Audit write: EXECUTION_STARTED | deny / `AUDIT_UNAVAILABLE` | not_started | F | F | `AUDIT_UNAVAILABLE` | 0 |
-| Registry lookup fails in proxy | deny / `INTERNAL_ERROR` | not_started | F | T | `INTERNAL_ERROR` | 0 |
-| Action digest mismatch (mutated action) | deny / `ACTION_MISMATCH` | not_started | F | T | `ACTION_MISMATCH` | 0 |
-| Proxy path re-resolution differs | deny / `RESTRICTED_PATH` | not_started | F | T | `RESTRICTED_PATH` | 0 |
+| Audit write: REQUEST_RECEIVED | **null** / `AUDIT_UNAVAILABLE` *(rev. 7: operational refusal; was deny)* | not_started | F | F | `AUDIT_UNAVAILABLE` | 0 |
+| Gateway raises unexpectedly | **null** / `INTERNAL_ERROR` *(rev. 6, Q-03c; was deny)* | not_started | F | T | `INTERNAL_ERROR` | 0 |
+| Identity raises | **null** / `INTERNAL_ERROR` *(rev. 6, Q-03c; was deny)* | not_started | F | T | `INTERNAL_ERROR` | 0 |
+| Detector raises | **null** / `INTERNAL_ERROR` *(rev. 6, Q-03c; was deny)* | not_started | F | T | `INTERNAL_ERROR` | 0 |
+| Policy raises | **null** / `INTERNAL_ERROR` *(rev. 6, Q-03c; was deny)* | not_started | F | T | `INTERNAL_ERROR` | 0 |
+| Audit write: IDENTITY_RESOLVED / FINDING (before policy) | **null** / `AUDIT_UNAVAILABLE` *(rev. 7: operational refusal; was deny)* | not_started | F | F | `AUDIT_UNAVAILABLE` | 0 |
+| Audit write: DECISION (policy decided **allow**) | **allow** (preserved) / `AUDIT_UNAVAILABLE` *(rev. 7; was deny)* | not_started | F | F | `AUDIT_UNAVAILABLE` | 0 |
+| Audit write: DECISION (policy decided **deny**) | **deny** (preserved, a real policy decision) / the policy reason | not_started | F | F | `AUDIT_UNAVAILABLE` | 0 |
+| Audit write: EXECUTION_STARTED | **allow** (preserved) / `AUDIT_UNAVAILABLE` *(rev. 7; was deny)* | not_started | F | F | `AUDIT_UNAVAILABLE` | 0 |
+| Registry lookup fails in proxy | **null** / `INTERNAL_ERROR` *(rev. 6, Q-03c; was deny)* | not_started | F | T | `INTERNAL_ERROR` | 0 |
+| Action digest mismatch (mutated action) | **null** / `ACTION_MISMATCH` *(rev. 7: operational refusal; was deny)* | not_started | F | T | `ACTION_MISMATCH` | 0 |
+| Proxy path re-resolution differs | **null** / `RESTRICTED_PATH` *(rev. 7: operational refusal; was deny)* | not_started | F | T | `RESTRICTED_PATH` | 0 |
 | Tool raises | allow / `TOOL_FAILED` | failed | F | T | `TOOL_FAILED` | 1 |
 | Output filter raises | allow / `OUTPUT_FILTER_FAILED` | succeeded | F | T | `OUTPUT_FILTER_FAILED` | 1 |
 | Audit write: REQUEST_COMPLETED after success | allow / `AUDIT_UNAVAILABLE` | **succeeded** | F | F | `AUDIT_UNAVAILABLE` | 1 |
@@ -137,7 +139,9 @@ Result fields follow C1.6: `decision` / `reason` / `execution` / `output_release
 | Process killed after EXECUTION_STARTED (simulated: abort the pipeline in the spy, e.g. with a `BaseException` subclass) | — (exception propagates) | audit reconstruction ⇒ **unknown** | — | — | — | 1 |
 | Invalid `SecurityPolicy` / non-existent prefix at construction | `ConfigurationError`; no client | — | — | — | — | — |
 
-Proxy-stage blocks (registry lookup, digest mismatch, re-resolution): the DECISION audit event records policy's `allow`, but the **effective** decision returned, and recorded on REQUEST_COMPLETED, is `deny` with the proxy's reason (C1.4, C1.6). The audit therefore shows both what policy decided and what was enforced.
+Proxy-stage blocks (digest mismatch, re-resolution): the DECISION audit event records policy's `allow`. *(Rev. 2–6: "the **effective** decision returned … is `deny`".)* **Rev. 7:** the result and REQUEST_COMPLETED carry `decision=None` with the refusal's code (C1.4, C1.6 rev. 6 table). The audit therefore shows both what policy decided and what was enforced.
+
+**Rev. 6 (Q-03c):** unexpected internal errors (the gateway, identity, detector and policy rows, and the registry-lookup row) are **not** denials. The result has `decision=None`, `reason`/`error_code="INTERNAL_ERROR"`, `execution="not_started"`, `output_released=False`. REQUEST_COMPLETED records a NULL decision, with D-29 diagnostics on an ERROR event (no message text). Every such row additionally asserts that `decision != "deny"`.
 
 Every row also asserts: no exception message, file path or SQL appears in `reason`, `error_code` or any audit field.
 
@@ -151,17 +155,21 @@ These are the non-negotiable invariants. Each one **will be** implemented in `te
 | NI-02 | decision = REQUIRE_APPROVAL ⇒ spy count = 0 | SEC-003 |
 | NI-03 | `authorized = False` ⇒ spy count = 0 | SEC-004 |
 | NI-04 | any pre-execution audit write fails ⇒ spy count = 0 | SEC-005 |
-| NI-05 | any security-critical stage raises before execution ⇒ DENY `INTERNAL_ERROR` ∧ spy count = 0 | SEC-009 |
+| NI-05 | any security-critical stage raises before execution ⇒ `decision is None` ∧ `error_code = "INTERNAL_ERROR"` ∧ `execution = "not_started"` ∧ spy count = 0 *(rev. 6, Q-03c; rev. 1–5: "⇒ DENY `INTERNAL_ERROR`")* | SEC-009, SEC-033 |
 | NI-06 | spy count = 1 ⇒ committed DECISION(allow) **and** EXECUTION_STARTED events with the same `request_id` and `action_digest` existed **before** the call (checked from inside the spy through a separate DB connection) | SEC-005, SEC-010 |
 | NI-07 | spy count = 0 ⇔ `execution == "not_started"`; spy count = 1 ⇔ `execution ∈ {succeeded, failed}` (the in-process pipeline never returns `unknown` in v1) | SEC-022 |
 | NI-08 | the kwargs received by the spy equal `decision.action.arguments` (path arguments canonical), and mutating them inside the tool does not change the audited values | SEC-010 |
 | NI-09 | proxy given a non-ALLOW decision, or a decision for another `request_id` ⇒ spy count = 0 | SEC-010 |
 | NI-10 | ALLOW ⇒ tool ∈ agent grants | SEC-001 |
 | NI-11 | the canary secret appears in no audit row, log record, exception string or serialised result | SEC-008 |
-| NI-12 | when the audit store is available, every request produces exactly one DECISION and exactly one REQUEST_COMPLETED event, and REQUEST_COMPLETED is last | FR-012 |
+| NI-12 | when the audit store is available, every request produces exactly one REQUEST_COMPLETED event (last) and **at most one** DECISION event, which exists iff policy reached a decision *(rev. 7; rev. 1–6: "exactly one DECISION")* | FR-012 |
 | NI-13 | any mutation of `decision.action` after policy (top-level or nested argument values) ⇒ spy count = 0, `error_code="ACTION_MISMATCH"` | SEC-021 |
 | NI-14 | `decision ≠ allow ⇒ execution = not_started`; `output_released ⇒ execution = succeeded ∧ audit_complete`; a post-invocation failure never yields `decision = deny` | SEC-022 |
 | NI-15 | the C4.4 reconstruction of each request from audit rows alone matches the spy truth (not executed / executed); a run aborted after EXECUTION_STARTED reconstructs as **unknown** | SEC-023 |
+| NI-16 | **(rev. 3)** for every decision, the number of invocations is ≤ 1, under any interleaving of threads and asyncio tasks (atomic single-use claim) | SEC-024 |
+| NI-17 | **(rev. 3)** a `BaseException` after `entered` is re-raised unchanged, is never reported as `not_started` or DENY, and leaves the request reconstructable as **unknown** | SEC-027 |
+| NI-19 | **(rev. 6)** `error_code = "INTERNAL_ERROR" ⇒ decision ≠ "deny"`; serialized decision values ⊆ {`"allow"`, `"deny"`, `"require_approval"`}; `decision is None ⇒ ¬output_released ∧ execution = "not_started"` | SEC-033, SEC-022 |
+| NI-18 | **(rev. 3)** for a claimed request, no Sentinel code path invokes the tool a second time, whatever fails afterwards (filter, audit, mapping); at the adapter, a framework retry of the same `tool_call_id` does not execute again | SEC-026, SEC-025 |
 
 ## 8. Minimal end-to-end acceptance scenario ("walking skeleton")
 
@@ -183,9 +191,9 @@ Audit abbreviations: RR = REQUEST_RECEIVED, IR = IDENTITY_RESOLVED, DEC = DECISI
 | E2E-03 | `send_email(...)` | deny `UNAUTHORIZED_TOOL` | not_started · F · T | email=0 | RR, IR, DEC(deny), RC |
 | E2E-04 | agent `unknown_agent` `read_file(<ws>/data.txt)` | deny `UNAUTHORIZED_AGENT` | not_started · F · T | read=0 | RR, IR, DEC(deny), RC |
 | E2E-05 | `delete_file(<ws>/data.txt)` | require_approval | not_started · F · T; file still exists | delete=0 | RR, IR, DEC(require_approval), RC |
-| E2E-06 | `{"agent_id": "research_agent"}` (missing fields) | deny `INVALID_REQUEST` | not_started · F · T | all 0 | RR, DEC(deny), RC |
-| E2E-07 | E2E-01 with the audit store failing on DECISION | deny `AUDIT_UNAVAILABLE` | not_started · F · F | read=0 | RR, IR (then store down) |
-| E2E-08 | E2E-01 with `arguments` containing `agent_id: "admin"` | deny `INVALID_REQUEST` | not_started · F · T | read=0 | RR, DEC(deny), RC |
+| E2E-06 | `{"agent_id": "research_agent"}` (missing fields) | **null** `INVALID_REQUEST` *(rev. 7: operational refusal; was deny)* | not_started · F · T | all 0 | RR, RC(decision NULL) *(rev. 7; was RR, DEC(deny), RC)* |
+| E2E-07 | E2E-01 with the audit store failing on DECISION | **allow** (policy decision preserved) `AUDIT_UNAVAILABLE` *(rev. 7; was deny)* | not_started · F · F | read=0 | RR, IR (then store down) |
+| E2E-08 | E2E-01 with `arguments` containing `agent_id: "admin"` | **null** `INVALID_REQUEST` *(rev. 7: operational refusal; was deny)* | not_started · F · T | read=0 | RR, RC(decision NULL) *(rev. 7; was RR, DEC(deny), RC)* |
 | E2E-09 | E2E-01 with the audit store failing on RC | allow `AUDIT_UNAVAILABLE` | **succeeded** · F · F | read=1 | RR, IR, DEC(allow), ES (RC missing; masked fallback log present) |
 
 Also asserted for all nine: `evaluate_request` raised nothing; all events share the `request_id`; NI-01–NI-15 hold where applicable. The quickstart (FR-023) demonstrates E2E-01 to E2E-05.
@@ -207,6 +215,8 @@ Also asserted for all nine: `evaluate_request` raised nothing; all events share 
 ## 10. Framework interception feasibility (C-02 experiment, then M5)
 
 The experiment is now fully specified as **E1–E8 in `decision_record.md` §3.4**: environment, procedure, pass criteria, report location and stop condition. That specification supersedes the S1–S7 list from rev. 1, which maps as S1→E1, S2→E3, S3→E5, S4→E2/E4, S5→E6, S6→E8, S7→the offline constraint. It was **not executed** in Phase 1.5.
+
+**Rev. 3:** executed as C-02 and extended by C-02b (reports in `docs/aidlc/02-construction/`). The production adapter tests derived from them are listed in §15.
 
 M5 adapter tests turn E1, E2 and E4 into permanent regression tests (FR-021, SEC-016), plus an identity-injection test (SEC-013: model-supplied `agent_id` is ignored or rejected).
 
@@ -234,7 +244,7 @@ M5 adapter tests turn E1, E2 and E4 into permanent regression tests (FR-021, SEC
 - Detection effectiveness will be reported as measured counts on a stated corpus (M2), never as a general detection rate.
 - Passing tests demonstrate the invariants for calls routed through Sentinel in the tested configurations. They do not show that an agent system is "safe".
 
-## 14. Contract → acceptance-test map (rev. 2)
+## 14. Contract → acceptance-test map (rev. 4)
 
 Every security contract in `decision_record.md` has at least one acceptance test. A contract becomes testable only once its decision is Approved; until then, the tests are specified but not yet authoritative.
 
@@ -250,4 +260,74 @@ Every security contract in `decision_record.md` has at least one acceptance test
 | C1.8 errors | D-03, D-24d | §6 matrix (no row raises); NI-11 canary |
 | C2 filesystem | D-05, D-18, D-21 | §5 F1–F20; E2E-02 |
 | C3 identity and integration | D-04, D-12 | E1–E8 (experiment evidence); M5 regression tests |
+| **C1.4 rule 5** atomic single-use claim (rev. 3) | D-25 | NI-16; AT-01–AT-03, AT-22 |
+| **C1.6/C1.7** interruption → unknown (rev. 3) | D-14 amendment | NI-17; AT-08–AT-10 |
+| **C3.5** adapter execution contract (rev. 3) | D-12, D-26, D-27, D-29–D-31 | NI-18; AT-04–AT-07, AT-11–AT-21, AT-23–AT-27, AT-32–AT-39 |
+| **C1.4 rule 6** exact-action binding, canonical digest (rev. 4) | D-07 | AT-23, AT-28–AT-31 |
+| **C1.8 / D-29** diagnostics (rev. 4) | D-29 | AT-12, AT-32, AT-33 |
+| **D-30** internal async entry (rev. 4) | D-30 | AT-02, AT-08, AT-34 |
+| **D-31** guard expiry, capacity, session rule (rev. 4) | D-31 | AT-26, AT-35, AT-36 |
+| **C1.6/C1.8 Q-03c** internal errors distinct from denials (rev. 6) | Q-03c | NI-05, NI-19; AT-40–AT-43 |
+| **C1.6 rev. 6** operational refusals are not policy decisions (rev. 7) | owner, §12 rev. 6 | NI-12 (revised); AT-44–AT-47 |
 | C4 persistence | D-09, D-11 | NI-12, NI-15; `test_audit_storage_default.py` (FR-024); repository introspection (SEC-018); schema-version mismatch test (C4.6 item 4) |
+
+## 15. Adapter and concurrency acceptance tests (rev. 3)
+
+These tests implement the C-02/C-02b decisions against **production** code (pipeline, proxy, adapter). Status columns:
+
+- **Spike evidence:** `SPIKE-RAN` = the scenario passed in a spike against stand-ins (it shows feasibility, not that Sentinel works); `NOT-RUN` = never demonstrated anywhere.
+- **Production:** `PROD-TODO` unless marked otherwise. *(Rev. 3–4: "No production test below exists yet.")* **Rev. 5:** AT-28 and AT-29 are fully implemented; AT-30 and AT-31 are implemented at model level (C-03a). **Rev. 8 (C-03):** the model-level parts of AT-36, AT-40, AT-41, AT-44 and AT-46 are implemented in `tests/unit/test_models.py` (result-invariant table: 17 valid and 20 invalid rows) and pass. Their pipeline, gateway and adapter parts remain `PROD-TODO`. All others remain `PROD-TODO`.
+
+Framework-dependent tests live in `tests/integrations/`, are marked `integration_framework`, and run against the pinned baseline (NFR-019). Concurrency tests use a barrier (threads) or `asyncio.gather` (tasks) and **must** include a deliberately non-atomic test double, to prove the test can fail.
+
+| ID | Requirement | Test (production) | Expected | Spike evidence | Production | Increment |
+|---|---|---|---|---|---|---|
+| AT-01 | SEC-024 | 8 threads released by a barrier try to consume one ALLOW decision; 100 trials | Exactly 1 invocation and 7 `DECISION_ALREADY_USED` refusals per trial | SPIKE-RAN (C-02b B5/D3: 100/100) | PROD-TODO | C-10 |
+| AT-02 | SEC-024, FR-026 | Same with 8 asyncio tasks via the async path | Same | SPIKE-RAN (C-02b B5/D3: 100/100) | PROD-TODO | C-10/C-11 |
+| AT-03 | SEC-024 (test power) | Run AT-01/AT-02 against a non-atomic claim test double | Duplicates observed in ≥ 1 trial (the suite must detect a race) | SPIKE-RAN (racy control: 50/50 trials duplicated) | PROD-TODO | C-10 |
+| AT-04 | SEC-025 | Tool fails after its side effect; adapter in "propagate" fault mode with the guard on; framework retries the same `tool_call_id` via `ToolRetryMiddleware(max_retries=2)` and via `RetryPolicy(max_attempts=3)` | 1 invocation; retries end as `DUPLICATE_TOOL_CALL` (not executed) | SPIKE-RAN (C-02b A10, B7, C5) | PROD-TODO | C-16 |
+| AT-05 | SEC-025 | Agent loop re-issues the same tool with a **new** `tool_call_id` | Second call is independently evaluated (new decision) and executes if allowed. Documents that the guard does not stop new ids | SPIKE-RAN (C-02b A10 agent-loop: 2 decisions, 2 executions) | PROD-TODO | C-16 |
+| AT-06 | SEC-025, D-31 | Same `tool_call_id`, different `session_id` (and different `agent_id`) | Not blocked: the key includes agent and session | NOT-RUN | PROD-TODO | C-10 |
+| AT-07 | SEC-025 | First attempt with id X is **denied**; a later attempt with id X is allowed | The denied attempt did not consume X; the later attempt executes once | NOT-RUN | PROD-TODO | C-10 |
+| AT-08 | SEC-027 | Cancel an async-native tool mid-execution (caller timeout) | Started 1, completed 0, `CancelledError`/`TimeoutError` reaches the caller, no re-execution for ≥ 2× the tool duration; audit has REQUEST_COMPLETED(`unknown`) or reconstructs as unknown | SPIKE-RAN for proxy state and no-retry (C-02b B6); audit part NOT-RUN | PROD-TODO | C-10/C-11 |
+| AT-09 | SEC-027 | Cancel while the pipeline is still evaluating (before `entered`) | Spy 0; the `BaseException` propagates. Reconstruction from audit = not executed if no EXECUTION_STARTED was committed; = **unknown** (conservative, never "executed") if cancellation landed between EXECUTION_STARTED and `entered` | NOT-RUN | PROD-TODO | C-11 |
+| AT-10 | SEC-027 | Interruption after `entered` while the audit store raises on every write | The original `BaseException` propagates (not replaced); reconstruction from committed rows = unknown | NOT-RUN | PROD-TODO | C-11 |
+| AT-11 | SEC-026, NI-18 | Tool fails after its side effect; adapter in normal mode; under `RetryPolicy(max_attempts=3)` and `ToolRetryMiddleware(max_retries=2)`; sync, async-native, `Command` tools | Exactly 1 invocation in every combination; model sees `"tool failed (execution may have occurred)"` | SPIKE-RAN (C-02b retry matrix; naive propagation → 3) | PROD-TODO | C-16 |
+| AT-12 | SEC-026, SEC-008, D-29 | Same, with a canary in the exception message | Canary absent from model-visible text and from the graph caller's exception; audit row has type, module, stage and location, and no message text (default config) | SPIKE-RAN for model-visible text; audit part NOT-RUN | PROD-TODO | C-09/C-16 |
+| AT-13 | SEC-028 | `Command(update=…)` and `Command(goto=…)` tools, sync and async, via `ToolNode` and `create_agent`: original vs wrapped | Identical final state, messages and routing | SPIKE-RAN (C-02b C1–C2, C6) | PROD-TODO | C-16 |
+| AT-14 | SEC-028, SEC-002/003 | Denied and approval-required `Command` tools | 0 invocations; routing target ran 0 times; no state update; error `ToolMessage`, never a `Command` | SPIKE-RAN (C-02b C3–C4) | PROD-TODO | C-16 |
+| AT-15 | SEC-028 | `InjectedToolCallId` tool | Id forwarded to the original (framework validation passes); model-facing schema and evaluated action exclude it | SPIKE-RAN (C-02b C1–C2) | PROD-TODO | C-16 |
+| AT-16 | SEC-029 | Tools with `InjectedState`, `InjectedStore`, `ToolRuntime` parameters | Refused at wrap time | SPIKE-RAN for `InjectedState`; NOT-RUN for `InjectedStore`, `ToolRuntime` | PROD-TODO | C-16 |
+| AT-17 | SEC-029 | `dict` provider tool; class-based `BaseTool`; tool without Sentinel metadata | Refused at wrap time | SPIKE-RAN (C-02b A5–A6) | PROD-TODO | C-16 |
+| AT-18 | SEC-030 | Model emits an unknown tool name; contrast with a denied tool | Unknown: 0 evaluations, 0 invocations, framework message. Denied: 1 evaluation | SPIKE-RAN (C-02b A4) | PROD-TODO | C-16 |
+| AT-19 | FR-025, SEC-031 | Coverage report on: mixed agent (wrapped + unwrapped); middleware-supplied tool; unrecognised structure | `{wrapped: true, unwrapped: false}`; middleware tool `false`; "not inspectable" | SPIKE-RAN for the first two (C-02b A5–A6); third NOT-RUN | PROD-TODO | C-16 |
+| AT-20 | SEC-002/003, SEC-016 | Deny/approval matrix: tool kind (sync, async-native, `Command`) × entry point (`create_agent`/`ToolNode`, sync and async) | 0 invocations everywhere; explicit evaluation where the adapter is reached | SPIKE-RAN (C-02b D4–D5: 20 rows, 0 invocations) | PROD-TODO | C-16 |
+| AT-21 | SEC-016, SEC-030 | Sync entry into an async-only wrapped tool | Framework rejects; 0 evaluations, 0 invocations | SPIKE-RAN (C-02b B4, D4–D5) | PROD-TODO | C-16 |
+| AT-22 | SEC-024 | Sequential replay of one decision (sync and async paths) | First executes; second refused | SPIKE-RAN (C-02b D1–D2) | PROD-TODO | C-10 |
+| AT-23 | SEC-010, SEC-021 | Forged decision: args A used for args B; tool X for tool Y; DENY decision; args mutated after evaluation (sync and async) | Not executed in every case | SPIKE-RAN (C-02 B4; C-02b D1–D2) | PROD-TODO | C-10 |
+| AT-24 | NFR-016 | Parallel tool calls in one model turn (thread pool and asyncio) with the real SQLite audit store | No errors; expected rows; no lost or interleaved events | NOT-RUN | PROD-TODO | C-11/C-16 |
+| AT-25 | SEC-025, FR-012 | Audit rows for a duplicate `tool_call_id` attempt | DECISION(allow) recorded, then REQUEST_COMPLETED(decision NULL, `DUPLICATE_TOOL_CALL`, not_started) (rev. 7; was "deny `DUPLICATE_TOOL_CALL`"); no EXECUTION_STARTED; reconstructs as not executed | NOT-RUN | PROD-TODO | C-10/C-11 |
+| AT-26 | SEC-025, D-31 | **Rev. 4:** guard filled to capacity with **unexpired** entries (in flight and terminal-within-TTL), then a new guarded invocation | New invocation → `decision=None`, `GUARD_CAPACITY_EXHAUSTED` (rev. 7; was effective DENY), 0 invocations; **no existing entry is evicted** (a repeat of every existing key is still refused); a call without a `tool_call_id` is unaffected; after the injected clock passes TTL for one terminal entry, exactly one new guarded call is admitted. *Rev. 3 text ("Oldest keys evicted per D-31") superseded: eviction rejected by the owner* | NOT-RUN | PROD-TODO | C-10 |
+| AT-27 | SEC-031 | Documentation review: README, docstrings and log messages never describe unwrapped, middleware-supplied or provider built-in tools, or `Command` downstream effects, as protected | Checklist passes | NOT-RUN | PROD-TODO | C-16, C-18 |
+| AT-28 | SEC-032, D-07 | Compute the digest of the same action in ≥ 3 separate interpreter processes with different `PYTHONHASHSEED` values and different dict insertion orders | Identical digests | NOT-RUN (the spike digest was a stand-in, never tested across processes) | **IMPLEMENTED (C-03a), PASS**: `test_digest_is_identical_across_processes_and_hash_seeds` (4 seeds × 2 insertion orders, separate interpreters) | C-03 |
+| AT-29 | SEC-032, D-07 | Table-driven nested changes: a leaf value deep in a dict; list order; `int` → `str` type change; `1` vs `1.0` vs `True`; added or removed key; a canonical path that differs by one component; a Unicode composed vs decomposed string | Every case changes the digest; unchanged inputs keep it | NOT-RUN | **IMPLEMENTED (C-03a), PASS**: `test_every_nested_change_alters_the_digest` (14 cases), `test_identity_fields_alter_the_digest` | C-03 |
+| AT-30 | SEC-032, D-07, D-31 | Two requests differing only in `tool_call_id` | Identical action content (`agent_id`, `tool`, `arguments`), with `tool_call_id` absent from the digest input; the guard still distinguishes them by `tool_call_id` | SPIKE-RAN for exclusion from the evaluated args (C-02b C1–C2); digest part NOT-RUN | **Model part IMPLEMENTED (C-03a), PASS**: `test_tool_call_id_is_not_part_of_an_action`, `test_digest_input_is_exactly_the_four_action_fields`; guard part PROD-TODO (C-10) | C-03 (model), C-10 (guard) |
+| AT-31 | SEC-032, D-07 | Argument values that are not JSON-native (`set`, `bytes`, `datetime`, custom object, `NaN`, `inf`, non-`str` dict keys) | Rejected (`INVALID_REQUEST` at the gateway; a validation error at model level); never encoded with `repr` | NOT-RUN | **Model part IMPLEMENTED (C-03a), PASS**: `test_unsupported_values_are_rejected_nested_and_top_level` (19 value kinds, top-level and nested, error text without values), `test_arguments_must_be_a_dict`, `test_identity_fields_must_be_non_empty_str`; gateway mapping to `INVALID_REQUEST` PROD-TODO (C-06) | C-03, C-06 |
+| AT-32 | SEC-026, SEC-008, D-29 | Tool raises an exception whose message and a frame-local variable contain a canary, from a module at an absolute path | The audit `detail` has exception type, module, function, line, stage, `request_id`, tool, `error_code`; the canary, the message text, traceback text and any absolute path are **absent** from every audit row and log record | NOT-RUN | PROD-TODO | C-09, C-10 |
+| AT-33 | D-29 | Configuration surface | No configuration option enables storage of exception message text in v1 (introspection of the config model and its documentation) | NOT-RUN | PROD-TODO | C-09 |
+| AT-34 | FR-026, D-30 | API surface | The async pipeline entry is not in `sentinel.__all__` or any `sentinel.integrations.*.__all__`, is not a public `SentinelClient` attribute, and is marked internal in docs; the adapter uses it | NOT-RUN | PROD-TODO | C-11, C-12, C-16 |
+| AT-35 | SEC-025, D-31 | Guard expiry with an injected monotonic clock | An in-flight entry never expires (clock advanced beyond TTL while the tool is running → a repeat is still refused); a terminal entry is purged only after terminal time + TTL; after purge a repeat with the same key is treated as new (documented limitation) | NOT-RUN | PROD-TODO | C-10 |
+| AT-36 | SEC-025, D-31 | Request carrying a `tool_call_id` but no `session_id` | `decision=None`, `INVALID_REQUEST` (rev. 7; was DENY), 0 invocations, no guard entry created | NOT-RUN | PROD-TODO | C-03 (model rule), C-06 |
+| AT-37 | SEC-013, FR-022 (carried from C-17) | Through `create_agent`, the model emits a tool call whose arguments include `agent_id` / `session_id` / `tool_call_id` | Evaluated as the bound agent, or rejected per the D-04 outcome; never as the model-supplied identity; 0 executions under a foreign identity | NOT-RUN | PROD-TODO | C-16 |
+| AT-38 | FR-022, SEC-016 (carried from C-17 / E2) | `create_agent` with wrapped tools driven via `invoke`, `ainvoke`, `stream`, `astream`, `batch` | Every entry point evaluates before execution; denied tool never executes; sync entry into an async-only tool rejected by the framework | SPIKE-RAN for `invoke`/`ainvoke` (C-02b A, B); `stream`/`astream`/`batch` via `create_agent` NOT-RUN (via `ToolNode` SPIKE-RAN, C-02 B8) | PROD-TODO | C-16 |
+| AT-39 | FR-022 (carried from C-17 / C-16 "example") | Runnable example: a `create_agent` agent with one allowed and one denied wrapped tool, offline scripted model | Example exits 0; allowed tool runs once; denied tool 0 times; output shows the fixed-text denial | NOT-RUN | PROD-TODO | C-16 |
+| AT-40 | SEC-033, SEC-009 | Force an unexpected exception in each pre-invocation stage (gateway, identity, detector, policy, registry lookup, proxy checks), with a canary in the exception message | `decision is None` (never `"deny"`), `reason`/`error_code="INTERNAL_ERROR"`, `execution="not_started"`, `output_released=False`, spy 0; audit has ERROR with D-29 fields and REQUEST_COMPLETED with NULL decision; canary absent everywhere | NOT-RUN | PROD-TODO | C-03 (model), C-11 |
+| AT-41 | SEC-033, D-24i | Decision value set and fault matrix | `Decision` serializes only to `"allow"`, `"deny"`, `"require_approval"` (no `"error"`); across all §6 rows, `INTERNAL_ERROR` is never paired with `"deny"` | NOT-RUN | PROD-TODO | C-03, C-11 |
+| AT-42 | SEC-033, SEC-026 | Framework adapter receives an internal-error result, under `RetryPolicy` and `ToolRetryMiddleware` | Model sees exactly `"not executed: INTERNAL_ERROR"` (not `"blocked: …"`); no diagnostics in model-visible text; no exception escapes; 0 executions | NOT-RUN | PROD-TODO | C-16 |
+| AT-43 | SEC-033, D-03 | Unexpected internal error **after** the tool ran (e.g. in result mapping) | `decision="allow"` kept, `execution` truthful (`succeeded`/`failed`), output withheld, `error_code="INTERNAL_ERROR"`, never `"deny"`, no re-execution | NOT-RUN | PROD-TODO | C-11 |
+| AT-44 | SEC-034 | Each operational refusal: invalid request (shape, unregistered tool, schema, reserved key, `tool_call_id` without session), action mismatch, path changed after authorization, decision already used, duplicate `tool_call_id`, guard capacity exhausted | `decision is None`; the specific `error_code`; `execution="not_started"`; spy 0; REQUEST_COMPLETED decision NULL; never `"deny"` | NOT-RUN | PROD-TODO | C-03 (model), C-06, C-10, C-11 |
+| AT-45 | SEC-034, SEC-005 | Pre-execution audit failure at each write: REQUEST_RECEIVED, IDENTITY_RESOLVED, FINDING (before policy) vs DECISION, EXECUTION_STARTED (after policy) | Before policy → `decision=None`; after policy → the actual decision preserved (`allow` or `deny`); `AUDIT_UNAVAILABLE`; never executed | NOT-RUN | PROD-TODO | C-11 |
+| AT-46 | SEC-034, SEC-033 | Whole §6 fault matrix plus the E2E suite | `decision == "deny"` only with C1.5 policy reasons; every operational-refusal or internal-error code appears only with `decision` None (or a preserved real decision for `AUDIT_UNAVAILABLE`) | NOT-RUN | PROD-TODO | C-03, C-11 |
+| AT-47 | SEC-034, SEC-026 | Framework adapter receives each refusal | Fixed text `"not executed: <ERROR_CODE>"`, never `"blocked: …"`; no diagnostics; no escape; 0 executions; direct-caller exception mapping never uses `ActionDenied` for refusals | NOT-RUN | PROD-TODO | C-16 (C-03 for the exception classes) |
+
+**Also not demonstrated anywhere (no test can be claimed):** real provider `tool_call_id` behaviour; checkpoint resume/replay; `Send` / `Command.PARENT`; human-in-the-loop middleware; retry mechanisms other than the two tested. These are documented limitations (decision record C3.6), not acceptance tests.

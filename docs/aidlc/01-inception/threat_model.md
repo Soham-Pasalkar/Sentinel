@@ -5,7 +5,7 @@
 | Phase | Inception (initial model; revisit at the end of M1, M2 and M5) |
 | Date | 2026-10-28 |
 | Method | Asset- and attacker-centred threat enumeration over the enforcement sequence in `architecture_assessment.md` §4, with STRIDE categories as a checklist |
-| Status | Draft rev. 2 (Phase 1.5) — pending owner review. Rev. 2 updates T-03, T-06, T-07, T-09, T-11, T-12 for the contracts in [`decision_record.md`](decision_record.md) |
+| Status | Draft rev. 6 — pending owner review. **Rev. 6** (Q-03c) updates the T-16 mitigation wording. *Rev. 5* added the T-03 credentials note (header not updated at the time). Rev. 4 updates T-17 and T-18 and adds T-21. Rev. 2 updated T-03, T-06, T-07, T-09, T-11, T-12. **Rev. 3** (after C-02/C-02b) updates T-12 and adds T-17–T-20, for the contracts in [`decision_record.md`](decision_record.md) C1.4, C1.6, C3.5, C3.6 |
 
 ## 1. System under analysis
 
@@ -65,6 +65,7 @@ An in-process Python library sitting between agent frameworks and registered too
 - **Attack path:** an adapter that reads the identity from model-controlled data.
 - **Mitigations (deterministic):** identity bound by trusted code at wrap time (SEC-013); reserved identity keys rejected inside `arguments`; optional per-agent credentials compared with `hmac.compare_digest` on hashes (FR-006).
 - **Rev. 2:** contract C1.2/C3.1. `agent_id` comes only from the application-built `raw` or the `wrap_tools(agent_id=…)` parameter. `request_id` is added to the reserved keys. `require_credentials` flag (D-04).
+- **Rev. 5 (D-04 Approved):** credentials are configured per agent and `require_credentials` defaults to **`True`**, so an agent without a credential is denied unless a deployment opts out. Reserved identity keys in arguments are rejected, never stripped. The residual for AT6 (in-process code) is unchanged.
 - **Requirements:** SEC-013, FR-005, FR-006.
 - **Tests:** reserved-key rejection; adapter test in which the model injects `agent_id`; credential missing/wrong tests.
 - **Residual:** an integration that the developer wires to take identity from model data defeats this. Tokens do not protect against AT6.
@@ -146,6 +147,7 @@ An in-process Python library sitting between agent frameworks and registered too
 - **Tests:** spike evidence; adapter tests for sync, async and parallel calls.
 - **Residual:** framework upgrades can add new invocation paths. Pin supported version ranges and test against them.
 - **Rev. 2:** the guarantee is narrowed to tool objects returned by `wrap_tools()` on their sync path (C3.3, D-12). `protect(graph)` is not offered. The isolated experiment E1–E8 (C3.4) must pass E1 and E2 before C-03.
+- **Rev. 3:** E1/E2 passed (C-02). D-12 is Approved with Design B replacement tools covering sync, async-native (async entry points) and `Command` tools. The rev. 2 mitigation "async entry fails closed" is superseded: async-native tools are gated through the async path, and a sync entry into an async-only tool is rejected by the framework before the adapter (C-02b B4). Callback-based enforcement stays rejected (C-02 E8). Unsupported tool patterns are refused at wrap time (SEC-029). **Residual:** only the tested framework versions and patterns (C3.6). See T-17–T-20.
 
 ### T-13 — Malformed tool arguments
 - **Asset / property:** A7, A1.
@@ -174,10 +176,65 @@ An in-process Python library sitting between agent frameworks and registered too
 ### T-16 — Fail-open through misconfiguration or internal error
 - **Asset / property:** A7.
 - **Scenario:** an invalid policy file loads as empty and allows everything; an exception in the detector is caught and treated as "no findings".
-- **Mitigations (deterministic):** invalid configuration raises; any stage exception before execution ⇒ DENY `INTERNAL_ERROR` (SEC-009, CF-01, CF-06).
+- **Mitigations (deterministic):** invalid configuration raises; any stage exception before execution ⇒ *(rev. 1–5: DENY `INTERNAL_ERROR`)* **rev. 6 (Q-03c):** `decision=None`, `error_code="INTERNAL_ERROR"`, `execution="not_started"`, no output. It still fails closed, and is no longer mislabelled as a policy denial (SEC-009, SEC-033, CF-01, CF-06).
 - **Requirements:** SEC-009, FR-009.
 - **Tests:** a fault-injection test per stage; invalid-config tests.
 - **Residual:** low.
+
+### T-17 — Framework retry repeats a side effect (rev. 3)
+- **Asset / property:** A1 / integrity (at-most-once side effects).
+- **Scenario:** a tool performs its side effect and then fails (or Sentinel's post-execution step fails). An exception escapes into the framework, and `RetryPolicy` or `ToolRetryMiddleware` re-runs the tool. *Observed:* 3 executions with a naive adapter (C-02 E6, C-02b retry matrix).
+- **Mitigations (deterministic):** the adapter converts post-execution failures into fixed-text in-tool `ToolException`s, so no exception reaches the retry mechanism (SEC-026, D-26). No Sentinel path re-invokes a claimed request (C1.7). Defense in depth: at-most-once per `(agent_id, session_id, tool_call_id)` (SEC-025, D-27).
+- **Requirements:** SEC-025, SEC-026, NI-18.
+- **Tests:** AT-04, AT-05, AT-11, AT-12, AT-25.
+- **Residual:** retry mechanisms other than the two tested; a **new** call with a **new** `tool_call_id` (model-driven repeat) executes again by design; uniqueness of real provider ids is untested. Non-idempotent tools remain a deployment risk.
+  - *Rev. 3 also listed "guard eviction (D-31)".* **Rev. 4:** eviction of unexpired entries is forbidden (D-31 Approved). The remaining guard residuals are: a repeat after the entry's TTL (counted from the terminal state) or after a process restart; and availability loss when capacity is exhausted (T-21). No exactly-once external effect is claimed.
+
+### T-18 — Concurrent or replayed consumption of one decision (rev. 3)
+- **Asset / property:** A7 / integrity (one decision, one action).
+- **Scenario:** a decision is consumed twice: by a bug, a replay, or two threads or tasks racing.
+- **Mitigations (deterministic):** atomic single-use claim with no `await` or I/O between check and mark, shared by the sync and async paths (SEC-024, D-25); exact-action digest binding (D-07, **Approved in rev. 4**). The digest is deterministic across processes and covers every nested argument and resolved path; `tool_call_id` is excluded (SEC-032).
+- **Requirements:** SEC-024, SEC-010, SEC-021, NI-16.
+- **Tests:** AT-01–AT-03 (including the racy test double that must fail), AT-22, AT-23, AT-28–AT-31.
+- **Residual:** claims are per process (single-process scope); in-process code can still forge or bypass (T-11).
+
+### T-19 — Interruption after a tool starts (rev. 3)
+- **Asset / property:** A5, A7 / truthful records.
+- **Scenario:** an async tool is cancelled (caller timeout, task cancellation) or the process receives `KeyboardInterrupt` after the tool started. A naive implementation could record "not executed", convert it to a denial, or let a retry run it again.
+- **Mitigations:** proxy state `interrupted`; one best-effort REQUEST_COMPLETED(`unknown`); the `BaseException` is re-raised unchanged; never converted to DENY, `not_started` or a retry (SEC-027, D-14 amendment). Reconstruction rules classify the request as unknown even if the best-effort write fails (C4.4). *Observed:* C-02b B6 (state only).
+- **Requirements:** SEC-022, SEC-027, NI-17.
+- **Tests:** AT-08–AT-10.
+- **Residual:** the side effect may have partly happened; whether an audit write can complete during cancellation is untested; a process kill leaves only EXECUTION_STARTED.
+
+### T-20 — Effects outside the adapter boundary: `Command`, trusted code, framework rejection (rev. 3)
+- **Asset / property:** A1, A7.
+- **Scenario:**
+  - (a) an **allowed** tool returns a `Command` whose `goto` routes to an unprotected node or updates state;
+  - (b) middleware or application code substitutes an original tool, or adds unwrapped or middleware-supplied tools (observed: C-02b A6, A8);
+  - (c) provider built-in tools execute remotely;
+  - (d) the framework rejects an unknown tool name before the adapter, leaving no Sentinel audit record.
+- **Mitigations:**
+  - The `Command` return value is passed through only on ALLOW; non-ALLOW never returns a `Command` (SEC-028).
+  - Unsupported patterns are refused (SEC-029).
+  - A coverage report (FR-025).
+  - Documentation that these paths are outside the boundary (SEC-031); framework rejections are not reported as Sentinel decisions (SEC-030).
+- **Requirements:** SEC-028–SEC-031, FR-025.
+- **Tests:** AT-13–AT-19, AT-27.
+- **Residual:** **inherent.** Sentinel authorizes tool calls routed through wrapped tools. It does not authorize graph routing, trusted code, or provider-side tools.
+
+### T-21 — Guard capacity exhaustion (availability) (rev. 4)
+- **Asset / property:** A1 / availability of guarded tool calls.
+- **Scenario:** D-31 forbids evicting unexpired entries and fails closed when the guard is full. A model, steered by injected content, issues many tool calls with fresh `tool_call_id`s. Or a busy deployment simply exceeds the configured capacity within the TTL window. New guarded invocations are then denied (`GUARD_CAPACITY_EXHAUSTED`) for every session in the process.
+- **Mitigations:**
+  - Capacity and TTL are configuration values, sized per deployment; the defaults are Proposed and set before C-10.
+  - Entries are purged deterministically once expired.
+  - Calls without a `tool_call_id` are unaffected.
+  - Denied calls never create entries, so flooding requires calls that pass policy.
+  - Rate limits (FR-019, M4) cap per-agent call rates.
+  - The denial is audited, so it is visible.
+- **Requirements:** SEC-025, FR-019.
+- **Tests:** AT-26, AT-35.
+- **Residual:** **accepted by design:** the owner chose fail-closed over eviction. A single process-wide capacity means one noisy session can exhaust it for others; per-session quotas are not in v1.
 
 ## 6. Threat → requirement → test matrix (summary)
 
@@ -199,6 +256,11 @@ An in-process Python library sitting between agent frameworks and registered too
 | T-14 | FR-019 | race tests (M4) | Low |
 | T-15 | SEC-009 | fault-injection outputs | Low |
 | T-16 | SEC-009, FR-009 | per-stage fault injection | Low |
+| T-17 | SEC-025, SEC-026 | AT-04, AT-05, AT-11, AT-12, AT-25 | Medium (untested retry mechanisms; new ids) |
+| T-18 | SEC-024, SEC-010, SEC-021 | AT-01–AT-03, AT-22, AT-23 | Low (single process) |
+| T-19 | SEC-027 | AT-08–AT-10 | Medium (outcome inherently unknown) |
+| T-20 | SEC-028–SEC-031 | AT-13–AT-19, AT-27 | **Inherent** |
+| T-21 | SEC-025, FR-019 | AT-26, AT-35 | Medium (fail-closed availability, by design) |
 
 ## 7. Items to revisit
 
