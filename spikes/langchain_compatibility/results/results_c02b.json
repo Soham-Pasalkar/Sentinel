@@ -1,0 +1,1642 @@
+{
+  "scenarios": [
+    {
+      "id": "A1-A3",
+      "title": "create_agent: authorized / denied / approval-required (sync tools)",
+      "ok": true,
+      "checks": [
+        {
+          "check": "[s_inc] invocation counter == 1",
+          "pass": true
+        },
+        {
+          "check": "[s_inc] exactly one gate evaluation, before any invocation",
+          "pass": true
+        },
+        {
+          "check": "[s_inc] agent run completed without raising",
+          "pass": true
+        },
+        {
+          "check": "[s_deny] invocation counter == 0",
+          "pass": true
+        },
+        {
+          "check": "[s_deny] exactly one gate evaluation, before any invocation",
+          "pass": true
+        },
+        {
+          "check": "[s_deny] agent run completed without raising",
+          "pass": true
+        },
+        {
+          "check": "[s_deny] explicit Sentinel decision surfaced ('blocked: POLICY'), proxy never claimed it",
+          "pass": true
+        },
+        {
+          "check": "[s_approval] invocation counter == 0",
+          "pass": true
+        },
+        {
+          "check": "[s_approval] exactly one gate evaluation, before any invocation",
+          "pass": true
+        },
+        {
+          "check": "[s_approval] agent run completed without raising",
+          "pass": true
+        },
+        {
+          "check": "[s_approval] explicit Sentinel decision surfaced ('blocked: REQUIRE_APPROVAL'), proxy never claimed it",
+          "pass": true
+        }
+      ],
+      "observed": {
+        "s_inc.messages": [
+          "HumanMessage 'go'",
+          "AIMessage calls=['s_inc'] ''",
+          "ToolMessage status=success 'inc:x'",
+          "AIMessage 'done'"
+        ],
+        "s_inc.proxy_states": {
+          "1": "completed"
+        },
+        "s_deny.messages": [
+          "HumanMessage 'go'",
+          "AIMessage calls=['s_deny'] ''",
+          "ToolMessage status=error 'blocked: POLICY'",
+          "AIMessage 'done'"
+        ],
+        "s_deny.proxy_states": {},
+        "s_approval.messages": [
+          "HumanMessage 'go'",
+          "AIMessage calls=['s_approval'] ''",
+          "ToolMessage status=error 'blocked: REQUIRE_APPROVAL'",
+          "AIMessage 'done'"
+        ],
+        "s_approval.proxy_states": {}
+      },
+      "notes": []
+    },
+    {
+      "id": "A4",
+      "title": "Framework rejection before adapter entry vs explicit Sentinel decision",
+      "ok": true,
+      "checks": [
+        {
+          "check": "unknown tool name: nothing executed",
+          "pass": true
+        },
+        {
+          "check": "unknown tool name is rejected by the FRAMEWORK: Sentinel recorded no evaluation",
+          "pass": true
+        },
+        {
+          "check": "denied tool: nothing executed, and Sentinel DID evaluate it (explicit decision)",
+          "pass": true
+        }
+      ],
+      "observed": {
+        "unknown_tool_name": {
+          "evaluations": 0,
+          "invocations": 0,
+          "text": [
+            "HumanMessage 'go'",
+            "AIMessage calls=['ghost'] ''",
+            "ToolMessage status=error 'Error: ghost is not a valid tool, try one of [s_deny].'",
+            "AIMessage 'done'"
+          ]
+        },
+        "denied_tool": {
+          "evaluations": 1,
+          "invocations": 0,
+          "text": [
+            "HumanMessage 'go'",
+            "AIMessage calls=['s_deny'] ''",
+            "ToolMessage status=error 'blocked: POLICY'",
+            "AIMessage 'done'"
+          ]
+        }
+      },
+      "notes": []
+    },
+    {
+      "id": "A5-A6",
+      "title": "Unwrapped tools: never represented as protected",
+      "ok": true,
+      "checks": [
+        {
+          "check": "[control] an unwrapped tool in the same agent executes with NO Sentinel evaluation",
+          "pass": true
+        },
+        {
+          "check": "coverage inspection of the compiled agent is available",
+          "pass": true
+        },
+        {
+          "check": "coverage inspection reports the unwrapped tool as NOT protected",
+          "pass": true
+        },
+        {
+          "check": "[control] a middleware-provided tool executes with NO Sentinel evaluation",
+          "pass": true
+        },
+        {
+          "check": "coverage inspection reports the middleware-provided tool as NOT protected",
+          "pass": true
+        },
+        {
+          "check": "wrap_tools refuses: provider built-in dict tool",
+          "pass": true
+        },
+        {
+          "check": "wrap_tools refuses: unregistered tool",
+          "pass": true
+        },
+        {
+          "check": "wrap_tools refuses: class-based BaseTool (no .func/.coroutine)",
+          "pass": true
+        }
+      ],
+      "observed": {
+        "A5.coverage": {
+          "s_inc": true,
+          "s_raw": false
+        },
+        "A5.unwrapped_call": {
+          "invocations": 1,
+          "evaluations": 0
+        },
+        "A6.coverage": {
+          "s_raw": false,
+          "s_inc": true
+        },
+        "A6.middleware_tool_call": {
+          "invocations": 1,
+          "evaluations": 0,
+          "messages": [
+            "HumanMessage 'go'",
+            "AIMessage calls=['s_raw'] ''",
+            "ToolMessage status=success 'raw:x'",
+            "AIMessage 'done'"
+          ]
+        },
+        "refusal[provider built-in dict tool]": "provider built-in (dict) tools execute outside this process and cannot be wrapped",
+        "refusal[unregistered tool]": "tool not registered with the gate: s_raw",
+        "refusal[class-based BaseTool (no .func/.coroutine)]": "unsupported tool class (no .func/.coroutine to relocate): ClassBasedTool"
+      },
+      "notes": []
+    },
+    {
+      "id": "A7-A8",
+      "title": "Agent middleware that modifies or redirects the tool call",
+      "ok": true,
+      "checks": [
+        {
+          "check": "middleware changed the arguments: the gate evaluated the CHANGED arguments (authorization follows what executes)",
+          "pass": true
+        },
+        {
+          "check": "evaluated arguments == executed arguments",
+          "pass": true
+        },
+        {
+          "check": "[control] trusted middleware can swap in an ORIGINAL denied tool: it ran with no evaluation (bypass by trusted code)",
+          "pass": true
+        }
+      ],
+      "observed": {
+        "A7.evaluated_args": [
+          "{\"label\": \"TAMPERED\"}"
+        ],
+        "A7.executed": [
+          {
+            "label": "str:'TAMPERED'"
+          }
+        ],
+        "A8.swapped_tool": {
+          "invoked": [
+            "s_deny"
+          ],
+          "evaluations": 0,
+          "messages": [
+            "HumanMessage 'go'",
+            "AIMessage calls=['s_inc'] ''",
+            "ToolMessage status=success 'deny:x'",
+            "AIMessage 'done'"
+          ]
+        }
+      },
+      "notes": [
+        "A8 is a bypass by trusted code (middleware is part of the agent definition). It is documented, not defended."
+      ]
+    },
+    {
+      "id": "A10",
+      "title": "create_agent: tool failing AFTER its side effect, with ToolRetryMiddleware",
+      "ok": true,
+      "checks": [
+        {
+          "check": "once_per_call_id adds an injected tool_call_id that stays invisible to the model",
+          "pass": true
+        },
+        {
+          "check": "[convert] failure converted to a fixed-text ToolException: the tool ran exactly once",
+          "pass": true
+        },
+        {
+          "check": "[convert] the exception text (canary) never reached the model",
+          "pass": true
+        },
+        {
+          "check": "[convert + once_per_call_id] exactly once",
+          "pass": true
+        },
+        {
+          "check": "[propagate + once_per_call_id] the framework retried but the adapter blocked the repeats: exactly once",
+          "pass": true
+        },
+        {
+          "check": "[control: naive propagate] the framework re-executed the tool after its post-execution failure (duplicate side effects)",
+          "pass": true
+        },
+        {
+          "check": "[agent-loop retry] model re-issued the call: two executions, each under its OWN decision (no decision consumed twice)",
+          "pass": true
+        }
+      ],
+      "observed": {
+        "convert": {
+          "mechanism": "ToolRetryMiddleware(max_retries=2)",
+          "tool": "sync",
+          "adapter": "on_tool_error=convert",
+          "executions": 1,
+          "evaluations": 1,
+          "states": [
+            "failed"
+          ],
+          "error": null,
+          "canary_in_output_or_error": false
+        },
+        "propagate": {
+          "mechanism": "ToolRetryMiddleware(max_retries=2)",
+          "tool": "sync",
+          "adapter": "on_tool_error=propagate",
+          "executions": 3,
+          "evaluations": 3,
+          "states": [
+            "failed",
+            "failed",
+            "failed"
+          ],
+          "error": null,
+          "canary_in_output_or_error": false
+        },
+        "propagate +once": {
+          "mechanism": "ToolRetryMiddleware(max_retries=2)",
+          "tool": "sync",
+          "adapter": "on_tool_error=propagate + once_per_call_id",
+          "executions": 1,
+          "evaluations": 2,
+          "states": [
+            "failed"
+          ],
+          "error": null,
+          "canary_in_output_or_error": false
+        },
+        "convert +once": {
+          "mechanism": "ToolRetryMiddleware(max_retries=2)",
+          "tool": "sync",
+          "adapter": "on_tool_error=convert + once_per_call_id",
+          "executions": 1,
+          "evaluations": 1,
+          "states": [
+            "failed"
+          ],
+          "error": null,
+          "canary_in_output_or_error": false
+        },
+        "once_per_call_id.schemas": {
+          "model_facing": [
+            "label"
+          ],
+          "all_incl_injected": [
+            "label",
+            "tool_call_id"
+          ]
+        },
+        "agent_loop_retry": {
+          "executions": 2,
+          "decisions": 2,
+          "states": [
+            "failed",
+            "failed"
+          ],
+          "messages": [
+            "HumanMessage 'go'",
+            "AIMessage calls=['s_fail_after'] ''",
+            "ToolMessage status=error 'tool failed (execution may have occurred)'",
+            "AIMessage calls=['s_fail_after'] ''",
+            "ToolMessage status=error 'tool failed (execution may have occurred)'",
+            "AIMessage 'done'"
+          ]
+        }
+      },
+      "notes": [
+        "An agent-loop retry is a new, separately authorized request. The adapter cannot tell it from a legitimate repeat; limiting it is a policy matter (e.g. rate limits, idempotency keys), not adapter logic."
+      ]
+    },
+    {
+      "id": "B1-B3",
+      "title": "Async-native tools: authorized / denied / approval-required",
+      "ok": true,
+      "checks": [
+        {
+          "check": "[a_inc via create_agent.ainvoke] invocation counter == 1",
+          "pass": true
+        },
+        {
+          "check": "[a_inc] exactly one gate evaluation, before any invocation",
+          "pass": true
+        },
+        {
+          "check": "[a_inc] completed without raising",
+          "pass": true
+        },
+        {
+          "check": "[a_inc via StateGraph+ToolNode.ainvoke] invocation counter == 1",
+          "pass": true
+        },
+        {
+          "check": "[a_deny via create_agent.ainvoke] invocation counter == 0",
+          "pass": true
+        },
+        {
+          "check": "[a_deny] exactly one gate evaluation, before any invocation",
+          "pass": true
+        },
+        {
+          "check": "[a_deny] completed without raising",
+          "pass": true
+        },
+        {
+          "check": "[a_deny via StateGraph+ToolNode.ainvoke] invocation counter == 0",
+          "pass": true
+        },
+        {
+          "check": "[a_approval via create_agent.ainvoke] invocation counter == 0",
+          "pass": true
+        },
+        {
+          "check": "[a_approval] exactly one gate evaluation, before any invocation",
+          "pass": true
+        },
+        {
+          "check": "[a_approval] completed without raising",
+          "pass": true
+        },
+        {
+          "check": "[a_approval via StateGraph+ToolNode.ainvoke] invocation counter == 0",
+          "pass": true
+        },
+        {
+          "check": "sync entry into an async-only wrapped tool does not execute and records no evaluation (fails closed, like the original)",
+          "pass": true
+        }
+      ],
+      "observed": {
+        "a_inc.messages": [
+          "HumanMessage 'go'",
+          "AIMessage calls=['a_inc'] ''",
+          "ToolMessage status=success 'a_inc:x'",
+          "AIMessage 'done'"
+        ],
+        "a_inc.evaluation_thread": [
+          "asyncio_0"
+        ],
+        "a_deny.messages": [
+          "HumanMessage 'go'",
+          "AIMessage calls=['a_deny'] ''",
+          "ToolMessage status=error 'blocked: POLICY'",
+          "AIMessage 'done'"
+        ],
+        "a_deny.evaluation_thread": [
+          "asyncio_0"
+        ],
+        "a_approval.messages": [
+          "HumanMessage 'go'",
+          "AIMessage calls=['a_approval'] ''",
+          "ToolMessage status=error 'blocked: REQUIRE_APPROVAL'",
+          "AIMessage 'done'"
+        ],
+        "a_approval.evaluation_thread": [
+          "asyncio_0"
+        ],
+        "sync_invoke_on_async_only.wrapped": {
+          "error": "NotImplementedError: StructuredTool does not support sync invocation.",
+          "invocations": 0,
+          "evaluations": 0
+        },
+        "sync_invoke_on_async_only.original_control": {
+          "error": "NotImplementedError: StructuredTool does not support sync invocation.",
+          "invocations": 0,
+          "evaluations": 0
+        }
+      },
+      "notes": []
+    },
+    {
+      "id": "B5/D3",
+      "title": "Concurrent attempts to consume the same decision",
+      "ok": true,
+      "checks": [
+        {
+          "check": "[async] atomic single-use: 100 trials x 8 contenders, every trial executed exactly once",
+          "pass": true
+        },
+        {
+          "check": "[async] 7 of 8 contenders refused in every trial",
+          "pass": true
+        },
+        {
+          "check": "[async] test power: the deliberately racy control DID execute more than once in some trials",
+          "pass": true
+        },
+        {
+          "check": "[thread] atomic single-use: 100 trials x 8 contenders, every trial executed exactly once",
+          "pass": true
+        },
+        {
+          "check": "[thread] 7 of 8 contenders refused in every trial",
+          "pass": true
+        },
+        {
+          "check": "[thread] test power: the deliberately racy control DID execute more than once in some trials",
+          "pass": true
+        }
+      ],
+      "observed": {
+        "async.atomic_proxy": {
+          "trials": 100,
+          "contenders": 8,
+          "trials_with_executions_ne_1": 0,
+          "max_executions": 1,
+          "refusals_total": 700
+        },
+        "async.racy_control": {
+          "trials": 50,
+          "contenders": 8,
+          "trials_with_executions_ne_1": 50,
+          "max_executions": 8,
+          "refusals_total": 0
+        },
+        "thread.atomic_proxy": {
+          "trials": 100,
+          "contenders": 8,
+          "trials_with_executions_ne_1": 0,
+          "max_executions": 1,
+          "refusals_total": 700
+        },
+        "thread.racy_control": {
+          "trials": 50,
+          "contenders": 8,
+          "trials_with_executions_ne_1": 50,
+          "max_executions": 8,
+          "refusals_total": 0
+        }
+      },
+      "notes": []
+    },
+    {
+      "id": "B6",
+      "title": "Cancellation of an async-native tool mid-execution",
+      "ok": true,
+      "checks": [
+        {
+          "check": "the call was cancelled by the caller's timeout",
+          "pass": true
+        },
+        {
+          "check": "the tool had STARTED (side effect possible) and did not complete",
+          "pass": true
+        },
+        {
+          "check": "no automatic re-execution after cancellation (counter stayed 1 for 0.9 s)",
+          "pass": true
+        },
+        {
+          "check": "the decision is recorded as 'interrupted', NOT as 'never started' (execution status unknown, not 'not_started')",
+          "pass": true
+        }
+      ],
+      "observed": {
+        "outcome": "TimeoutError",
+        "counters": {
+          "started": 1,
+          "completed": 0,
+          "cancelled": 1,
+          "evaluations": 1
+        },
+        "proxy_states": [
+          "interrupted"
+        ]
+      },
+      "notes": [
+        "CancelledError is a BaseException: it passes through `except Exception` handlers. The proxy must mark the request interrupted (EXECUTION_STARTED written, no completion), which the audit reconstruction rules classify as 'unknown'."
+      ]
+    },
+    {
+      "id": "B7",
+      "title": "Async-native tool failing AFTER its side effect, with retry mechanisms",
+      "ok": true,
+      "checks": [
+        {
+          "check": "[LangGraph RetryPolicy(] convert: executed exactly once",
+          "pass": true
+        },
+        {
+          "check": "[LangGraph RetryPolicy(] propagate + once_per_call_id: executed exactly once",
+          "pass": true
+        },
+        {
+          "check": "[LangGraph RetryPolicy(] control: naive propagate re-executed the tool",
+          "pass": true
+        },
+        {
+          "check": "[ToolRetryMiddleware(ma] convert: executed exactly once",
+          "pass": true
+        },
+        {
+          "check": "[ToolRetryMiddleware(ma] propagate + once_per_call_id: executed exactly once",
+          "pass": true
+        },
+        {
+          "check": "[ToolRetryMiddleware(ma] control: naive propagate re-executed the tool",
+          "pass": true
+        }
+      ],
+      "observed": {
+        "LangGraph Re|convert": {
+          "mechanism": "LangGraph RetryPolicy(max_attempts=3) on tools node",
+          "tool": "async",
+          "adapter": "on_tool_error=convert",
+          "executions": 1,
+          "evaluations": 1,
+          "states": [
+            "failed"
+          ],
+          "error": null,
+          "canary_in_output_or_error": false
+        },
+        "LangGraph Re|propagate": {
+          "mechanism": "LangGraph RetryPolicy(max_attempts=3) on tools node",
+          "tool": "async",
+          "adapter": "on_tool_error=propagate",
+          "executions": 3,
+          "evaluations": 3,
+          "states": [
+            "failed",
+            "failed",
+            "failed"
+          ],
+          "error": "SideEffectThenFail: CANARY-SECRET-IN-EXCEPTION-TEXT",
+          "canary_in_output_or_error": true
+        },
+        "LangGraph Re|propagate+once": {
+          "mechanism": "LangGraph RetryPolicy(max_attempts=3) on tools node",
+          "tool": "async",
+          "adapter": "on_tool_error=propagate + once_per_call_id",
+          "executions": 1,
+          "evaluations": 2,
+          "states": [
+            "failed"
+          ],
+          "error": null,
+          "canary_in_output_or_error": false
+        },
+        "ToolRetryMid|convert": {
+          "mechanism": "ToolRetryMiddleware(max_retries=2) in create_agent",
+          "tool": "async",
+          "adapter": "on_tool_error=convert",
+          "executions": 1,
+          "evaluations": 1,
+          "states": [
+            "failed"
+          ],
+          "error": null,
+          "canary_in_output_or_error": false
+        },
+        "ToolRetryMid|propagate": {
+          "mechanism": "ToolRetryMiddleware(max_retries=2) in create_agent",
+          "tool": "async",
+          "adapter": "on_tool_error=propagate",
+          "executions": 3,
+          "evaluations": 3,
+          "states": [
+            "failed",
+            "failed",
+            "failed"
+          ],
+          "error": null,
+          "canary_in_output_or_error": false
+        },
+        "ToolRetryMid|propagate+once": {
+          "mechanism": "ToolRetryMiddleware(max_retries=2) in create_agent",
+          "tool": "async",
+          "adapter": "on_tool_error=propagate + once_per_call_id",
+          "executions": 1,
+          "evaluations": 2,
+          "states": [
+            "failed"
+          ],
+          "error": null,
+          "canary_in_output_or_error": false
+        }
+      },
+      "notes": []
+    },
+    {
+      "id": "C1-C2",
+      "title": "Command-returning tools: return semantics preserved by the replacement tool",
+      "ok": true,
+      "checks": [
+        {
+          "check": "[c_note] original and wrapped runs both completed",
+          "pass": true
+        },
+        {
+          "check": "[c_note] the graph processed the returned Command identically (state, messages, routing)",
+          "pass": true
+        },
+        {
+          "check": "[c_note] wrapped: invoked exactly once, one evaluation before it",
+          "pass": true
+        },
+        {
+          "check": "[c_goto] original and wrapped runs both completed",
+          "pass": true
+        },
+        {
+          "check": "[c_goto] the graph processed the returned Command identically (state, messages, routing)",
+          "pass": true
+        },
+        {
+          "check": "[c_goto] wrapped: invoked exactly once, one evaluation before it",
+          "pass": true
+        },
+        {
+          "check": "InjectedToolCallId was forwarded to the original function (ToolMessage carries the model's call id)",
+          "pass": true
+        },
+        {
+          "check": "the injected id stays invisible to the model and to the gate's evaluated arguments",
+          "pass": true
+        },
+        {
+          "check": "tools with other injected parameters (InjectedState) are still refused",
+          "pass": true
+        },
+        {
+          "check": "async-native Command tool: executed once and the Command (state update) was applied",
+          "pass": true
+        }
+      ],
+      "observed": {
+        "c_note.original": {
+          "notes": [
+            "x"
+          ],
+          "messages": [
+            [
+              "HumanMessage",
+              null,
+              "go"
+            ],
+            [
+              "AIMessage",
+              null,
+              ""
+            ],
+            [
+              "ToolMessage",
+              "success",
+              "noted:x"
+            ],
+            [
+              "AIMessage",
+              null,
+              "done"
+            ]
+          ],
+          "side_node_runs": 0
+        },
+        "c_note.wrapped": {
+          "notes": [
+            "x"
+          ],
+          "messages": [
+            [
+              "HumanMessage",
+              null,
+              "go"
+            ],
+            [
+              "AIMessage",
+              null,
+              ""
+            ],
+            [
+              "ToolMessage",
+              "success",
+              "noted:x"
+            ],
+            [
+              "AIMessage",
+              null,
+              "done"
+            ]
+          ],
+          "side_node_runs": 0
+        },
+        "c_goto.original": {
+          "notes": [
+            "side"
+          ],
+          "messages": [
+            [
+              "HumanMessage",
+              null,
+              "go"
+            ],
+            [
+              "AIMessage",
+              null,
+              ""
+            ],
+            [
+              "ToolMessage",
+              "success",
+              "goto:x"
+            ],
+            [
+              "AIMessage",
+              null,
+              "done"
+            ],
+            [
+              "AIMessage",
+              null,
+              "done"
+            ]
+          ],
+          "side_node_runs": 1
+        },
+        "c_goto.wrapped": {
+          "notes": [
+            "side"
+          ],
+          "messages": [
+            [
+              "HumanMessage",
+              null,
+              "go"
+            ],
+            [
+              "AIMessage",
+              null,
+              ""
+            ],
+            [
+              "ToolMessage",
+              "success",
+              "goto:x"
+            ],
+            [
+              "AIMessage",
+              null,
+              "done"
+            ],
+            [
+              "AIMessage",
+              null,
+              "done"
+            ]
+          ],
+          "side_node_runs": 1
+        },
+        "model_facing_schema_c_note": [
+          "label"
+        ],
+        "ac_note.wrapped": {
+          "notes": [
+            "x"
+          ],
+          "messages": [
+            [
+              "HumanMessage",
+              null,
+              "go"
+            ],
+            [
+              "AIMessage",
+              null,
+              ""
+            ],
+            [
+              "ToolMessage",
+              "success",
+              "anoted:x"
+            ],
+            [
+              "AIMessage",
+              null,
+              "done"
+            ]
+          ],
+          "side_node_runs": 0
+        }
+      },
+      "notes": []
+    },
+    {
+      "id": "C3-C4",
+      "title": "Denied / approval-required Command tools: no Command, no routing, no execution",
+      "ok": true,
+      "checks": [
+        {
+          "check": "[c_deny] [control] the UNWRAPPED Command tool executes and routes to side_node",
+          "pass": true
+        },
+        {
+          "check": "[c_deny] wrapped: function never invoked",
+          "pass": true
+        },
+        {
+          "check": "[c_deny] wrapped: the Command's goto did not happen (side_node never ran)",
+          "pass": true
+        },
+        {
+          "check": "[c_deny] wrapped: no state update leaked (notes empty)",
+          "pass": true
+        },
+        {
+          "check": "[c_deny] wrapped: represented as an error ToolMessage, not a Command",
+          "pass": true
+        },
+        {
+          "check": "[c_approval] [control] the UNWRAPPED Command tool executes and routes to side_node",
+          "pass": true
+        },
+        {
+          "check": "[c_approval] wrapped: function never invoked",
+          "pass": true
+        },
+        {
+          "check": "[c_approval] wrapped: the Command's goto did not happen (side_node never ran)",
+          "pass": true
+        },
+        {
+          "check": "[c_approval] wrapped: no state update leaked (notes empty)",
+          "pass": true
+        },
+        {
+          "check": "[c_approval] wrapped: represented as an error ToolMessage, not a Command",
+          "pass": true
+        }
+      ],
+      "observed": {
+        "c_deny.control_unwrapped": {
+          "notes": [
+            "side"
+          ],
+          "messages": [
+            [
+              "HumanMessage",
+              null,
+              "go"
+            ],
+            [
+              "AIMessage",
+              null,
+              ""
+            ],
+            [
+              "ToolMessage",
+              "success",
+              "c_deny:x"
+            ],
+            [
+              "AIMessage",
+              null,
+              "done"
+            ],
+            [
+              "AIMessage",
+              null,
+              "done"
+            ]
+          ],
+          "side_node_runs": 1
+        },
+        "c_deny.wrapped": {
+          "notes": [],
+          "messages": [
+            [
+              "HumanMessage",
+              null,
+              "go"
+            ],
+            [
+              "AIMessage",
+              null,
+              ""
+            ],
+            [
+              "ToolMessage",
+              "error",
+              "blocked: POLICY"
+            ],
+            [
+              "AIMessage",
+              null,
+              "done"
+            ]
+          ],
+          "side_node_runs": 0
+        },
+        "c_approval.control_unwrapped": {
+          "notes": [
+            "side"
+          ],
+          "messages": [
+            [
+              "HumanMessage",
+              null,
+              "go"
+            ],
+            [
+              "AIMessage",
+              null,
+              ""
+            ],
+            [
+              "ToolMessage",
+              "success",
+              "c_approval:x"
+            ],
+            [
+              "AIMessage",
+              null,
+              "done"
+            ],
+            [
+              "AIMessage",
+              null,
+              "done"
+            ]
+          ],
+          "side_node_runs": 1
+        },
+        "c_approval.wrapped": {
+          "notes": [],
+          "messages": [
+            [
+              "HumanMessage",
+              null,
+              "go"
+            ],
+            [
+              "AIMessage",
+              null,
+              ""
+            ],
+            [
+              "ToolMessage",
+              "error",
+              "blocked: REQUIRE_APPROVAL"
+            ],
+            [
+              "AIMessage",
+              null,
+              "done"
+            ]
+          ],
+          "side_node_runs": 0
+        }
+      },
+      "notes": []
+    },
+    {
+      "id": "C5",
+      "title": "Command tool failing AFTER its side effect, with LangGraph RetryPolicy",
+      "ok": true,
+      "checks": [
+        {
+          "check": "[convert] executed exactly once",
+          "pass": true
+        },
+        {
+          "check": "[propagate + once_per_call_id] executed exactly once",
+          "pass": true
+        },
+        {
+          "check": "[control] naive propagate re-executed the Command tool",
+          "pass": true
+        }
+      ],
+      "observed": {
+        "convert": {
+          "mechanism": "LangGraph RetryPolicy(max_attempts=3) on tools node",
+          "tool": "command",
+          "adapter": "on_tool_error=convert",
+          "executions": 1,
+          "evaluations": 1,
+          "states": [
+            "failed"
+          ],
+          "error": null,
+          "canary_in_output_or_error": false
+        },
+        "propagate": {
+          "mechanism": "LangGraph RetryPolicy(max_attempts=3) on tools node",
+          "tool": "command",
+          "adapter": "on_tool_error=propagate",
+          "executions": 3,
+          "evaluations": 3,
+          "states": [
+            "failed",
+            "failed",
+            "failed"
+          ],
+          "error": "SideEffectThenFail: CANARY-SECRET-IN-EXCEPTION-TEXT",
+          "canary_in_output_or_error": true
+        },
+        "propagate+once": {
+          "mechanism": "LangGraph RetryPolicy(max_attempts=3) on tools node",
+          "tool": "command",
+          "adapter": "on_tool_error=propagate + once_per_call_id",
+          "executions": 1,
+          "evaluations": 2,
+          "states": [
+            "failed"
+          ],
+          "error": null,
+          "canary_in_output_or_error": false
+        }
+      },
+      "notes": []
+    },
+    {
+      "id": "C6",
+      "title": "Command tool inside create_agent (custom state key)",
+      "ok": true,
+      "checks": [
+        {
+          "check": "[original] create_agent applied the Command state update",
+          "pass": true
+        },
+        {
+          "check": "[wrapped] create_agent applied the Command state update",
+          "pass": true
+        }
+      ],
+      "observed": {
+        "original": {
+          "notes": [
+            "x"
+          ],
+          "error": null,
+          "invocations": 1
+        },
+        "wrapped": {
+          "notes": [
+            "x"
+          ],
+          "error": null,
+          "invocations": 1
+        }
+      },
+      "notes": []
+    },
+    {
+      "id": "D1-D2",
+      "title": "Decision bound to one exact action; single use (sync and async proxies)",
+      "ok": true,
+      "checks": [
+        {
+          "check": "[sync] decision for args A cannot execute args B",
+          "pass": true
+        },
+        {
+          "check": "[sync] decision for tool X cannot execute tool Y",
+          "pass": true
+        },
+        {
+          "check": "[sync] a DENY decision cannot be executed",
+          "pass": true
+        },
+        {
+          "check": "[sync] arguments mutated after evaluation are refused",
+          "pass": true
+        },
+        {
+          "check": "[sync] sequential replay: first executes, second refused (DECISION_ALREADY_USED)",
+          "pass": true
+        },
+        {
+          "check": "[async] decision for args A cannot execute args B",
+          "pass": true
+        },
+        {
+          "check": "[async] decision for tool X cannot execute tool Y",
+          "pass": true
+        },
+        {
+          "check": "[async] a DENY decision cannot be executed",
+          "pass": true
+        },
+        {
+          "check": "[async] arguments mutated after evaluation are refused",
+          "pass": true
+        },
+        {
+          "check": "[async] sequential replay: first executes, second refused (DECISION_ALREADY_USED)",
+          "pass": true
+        }
+      ],
+      "observed": {},
+      "notes": []
+    },
+    {
+      "id": "D4-D5",
+      "title": "DENY / REQUIRE_APPROVAL never execute: tool kind x verdict x entry point",
+      "ok": true,
+      "checks": [
+        {
+          "check": "[sync/deny/create_agent.invoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[sync/deny/create_agent.ainvoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[sync/deny/StateGraph+ToolNode.invoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[sync/deny/StateGraph+ToolNode.ainvoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[sync/approval/create_agent.invoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[sync/approval/create_agent.ainvoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[sync/approval/StateGraph+ToolNode.invoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[sync/approval/StateGraph+ToolNode.ainvoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[async/deny/create_agent.ainvoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[async/deny/StateGraph+ToolNode.ainvoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[async/approval/create_agent.ainvoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[async/approval/StateGraph+ToolNode.ainvoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[command/deny/StateGraph+ToolNode.invoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[command/deny/StateGraph+ToolNode.ainvoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[command/approval/StateGraph+ToolNode.invoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[command/approval/StateGraph+ToolNode.ainvoke] never executed, explicitly evaluated once, proxy never claimed",
+          "pass": true
+        },
+        {
+          "check": "[async/deny/create_agent.invoke sync entry] never executed and never claimed (framework fails before adapter entry; no Sentinel evaluation)",
+          "pass": true
+        },
+        {
+          "check": "[async/deny/StateGraph+ToolNode.invoke sync entry] never executed and never claimed (framework fails before adapter entry; no Sentinel evaluation)",
+          "pass": true
+        },
+        {
+          "check": "[async/approval/create_agent.invoke sync entry] never executed and never claimed (framework fails before adapter entry; no Sentinel evaluation)",
+          "pass": true
+        },
+        {
+          "check": "[async/approval/StateGraph+ToolNode.invoke sync entry] never executed and never claimed (framework fails before adapter entry; no Sentinel evaluation)",
+          "pass": true
+        }
+      ],
+      "observed": {
+        "matrix": [
+          {
+            "tool_kind": "sync",
+            "verdict": "deny",
+            "entry": "create_agent.invoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "sync",
+            "verdict": "deny",
+            "entry": "create_agent.ainvoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "sync",
+            "verdict": "deny",
+            "entry": "StateGraph+ToolNode.invoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "sync",
+            "verdict": "deny",
+            "entry": "StateGraph+ToolNode.ainvoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "sync",
+            "verdict": "approval",
+            "entry": "create_agent.invoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "sync",
+            "verdict": "approval",
+            "entry": "create_agent.ainvoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "sync",
+            "verdict": "approval",
+            "entry": "StateGraph+ToolNode.invoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "sync",
+            "verdict": "approval",
+            "entry": "StateGraph+ToolNode.ainvoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "async",
+            "verdict": "deny",
+            "entry": "create_agent.ainvoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "async",
+            "verdict": "deny",
+            "entry": "StateGraph+ToolNode.ainvoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "async",
+            "verdict": "approval",
+            "entry": "create_agent.ainvoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "async",
+            "verdict": "approval",
+            "entry": "StateGraph+ToolNode.ainvoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "command",
+            "verdict": "deny",
+            "entry": "StateGraph+ToolNode.invoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "command",
+            "verdict": "deny",
+            "entry": "StateGraph+ToolNode.ainvoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "command",
+            "verdict": "approval",
+            "entry": "StateGraph+ToolNode.invoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "command",
+            "verdict": "approval",
+            "entry": "StateGraph+ToolNode.ainvoke",
+            "invocations": 0,
+            "evaluations": 1,
+            "claimed_by_proxy": 0,
+            "error": null
+          },
+          {
+            "tool_kind": "async",
+            "verdict": "deny",
+            "entry": "create_agent.invoke (sync entry into async-only tool)",
+            "invocations": 0,
+            "evaluations": 0,
+            "claimed_by_proxy": 0,
+            "error": "NotImplementedError: StructuredTool does not support sync invocation."
+          },
+          {
+            "tool_kind": "async",
+            "verdict": "deny",
+            "entry": "StateGraph+ToolNode.invoke (sync entry into async-only tool)",
+            "invocations": 0,
+            "evaluations": 0,
+            "claimed_by_proxy": 0,
+            "error": "NotImplementedError: StructuredTool does not support sync invocation."
+          },
+          {
+            "tool_kind": "async",
+            "verdict": "approval",
+            "entry": "create_agent.invoke (sync entry into async-only tool)",
+            "invocations": 0,
+            "evaluations": 0,
+            "claimed_by_proxy": 0,
+            "error": "NotImplementedError: StructuredTool does not support sync invocation."
+          },
+          {
+            "tool_kind": "async",
+            "verdict": "approval",
+            "entry": "StateGraph+ToolNode.invoke (sync entry into async-only tool)",
+            "invocations": 0,
+            "evaluations": 0,
+            "claimed_by_proxy": 0,
+            "error": "NotImplementedError: StructuredTool does not support sync invocation."
+          }
+        ],
+        "rows": 20
+      },
+      "notes": []
+    },
+    {
+      "id": "D6",
+      "title": "A post-execution failure is not represented as 'not executed'",
+      "ok": true,
+      "checks": [
+        {
+          "check": "sync failure: proxy state is 'failed' (the function was entered)",
+          "pass": true
+        },
+        {
+          "check": "sync failure: message says execution may have occurred and does not claim 'blocked'/'not executed'",
+          "pass": true
+        },
+        {
+          "check": "async failure: proxy state 'failed', message says execution may have occurred",
+          "pass": true
+        },
+        {
+          "check": "contrast: a DENY leaves NO proxy state at all (never claimed, never entered)",
+          "pass": true
+        }
+      ],
+      "observed": {
+        "sync_failure": {
+          "proxy_states": [
+            "failed"
+          ],
+          "invocations": 1,
+          "message_to_model": "HumanMessage 'go' AIMessage calls=['s_fail_after'] '' ToolMessage status=error 'tool failed (execution may have occurred)' AIMessage 'done'"
+        }
+      },
+      "notes": []
+    }
+  ],
+  "retry_matrix": [
+    {
+      "mechanism": "ToolRetryMiddleware(max_retries=2)",
+      "tool": "sync",
+      "adapter": "on_tool_error=convert",
+      "executions": 1,
+      "evaluations": 1,
+      "states": [
+        "failed"
+      ],
+      "error": null,
+      "canary_in_output_or_error": false
+    },
+    {
+      "mechanism": "ToolRetryMiddleware(max_retries=2)",
+      "tool": "sync",
+      "adapter": "on_tool_error=propagate",
+      "executions": 3,
+      "evaluations": 3,
+      "states": [
+        "failed",
+        "failed",
+        "failed"
+      ],
+      "error": null,
+      "canary_in_output_or_error": false
+    },
+    {
+      "mechanism": "ToolRetryMiddleware(max_retries=2)",
+      "tool": "sync",
+      "adapter": "on_tool_error=propagate + once_per_call_id",
+      "executions": 1,
+      "evaluations": 2,
+      "states": [
+        "failed"
+      ],
+      "error": null,
+      "canary_in_output_or_error": false
+    },
+    {
+      "mechanism": "ToolRetryMiddleware(max_retries=2)",
+      "tool": "sync",
+      "adapter": "on_tool_error=convert + once_per_call_id",
+      "executions": 1,
+      "evaluations": 1,
+      "states": [
+        "failed"
+      ],
+      "error": null,
+      "canary_in_output_or_error": false
+    },
+    {
+      "mechanism": "LangGraph RetryPolicy(max_attempts=3) on tools node",
+      "tool": "async",
+      "adapter": "on_tool_error=convert",
+      "executions": 1,
+      "evaluations": 1,
+      "states": [
+        "failed"
+      ],
+      "error": null,
+      "canary_in_output_or_error": false
+    },
+    {
+      "mechanism": "LangGraph RetryPolicy(max_attempts=3) on tools node",
+      "tool": "async",
+      "adapter": "on_tool_error=propagate",
+      "executions": 3,
+      "evaluations": 3,
+      "states": [
+        "failed",
+        "failed",
+        "failed"
+      ],
+      "error": "SideEffectThenFail: CANARY-SECRET-IN-EXCEPTION-TEXT",
+      "canary_in_output_or_error": true
+    },
+    {
+      "mechanism": "LangGraph RetryPolicy(max_attempts=3) on tools node",
+      "tool": "async",
+      "adapter": "on_tool_error=propagate + once_per_call_id",
+      "executions": 1,
+      "evaluations": 2,
+      "states": [
+        "failed"
+      ],
+      "error": null,
+      "canary_in_output_or_error": false
+    },
+    {
+      "mechanism": "ToolRetryMiddleware(max_retries=2) in create_agent",
+      "tool": "async",
+      "adapter": "on_tool_error=convert",
+      "executions": 1,
+      "evaluations": 1,
+      "states": [
+        "failed"
+      ],
+      "error": null,
+      "canary_in_output_or_error": false
+    },
+    {
+      "mechanism": "ToolRetryMiddleware(max_retries=2) in create_agent",
+      "tool": "async",
+      "adapter": "on_tool_error=propagate",
+      "executions": 3,
+      "evaluations": 3,
+      "states": [
+        "failed",
+        "failed",
+        "failed"
+      ],
+      "error": null,
+      "canary_in_output_or_error": false
+    },
+    {
+      "mechanism": "ToolRetryMiddleware(max_retries=2) in create_agent",
+      "tool": "async",
+      "adapter": "on_tool_error=propagate + once_per_call_id",
+      "executions": 1,
+      "evaluations": 2,
+      "states": [
+        "failed"
+      ],
+      "error": null,
+      "canary_in_output_or_error": false
+    },
+    {
+      "mechanism": "LangGraph RetryPolicy(max_attempts=3) on tools node",
+      "tool": "command",
+      "adapter": "on_tool_error=convert",
+      "executions": 1,
+      "evaluations": 1,
+      "states": [
+        "failed"
+      ],
+      "error": null,
+      "canary_in_output_or_error": false
+    },
+    {
+      "mechanism": "LangGraph RetryPolicy(max_attempts=3) on tools node",
+      "tool": "command",
+      "adapter": "on_tool_error=propagate",
+      "executions": 3,
+      "evaluations": 3,
+      "states": [
+        "failed",
+        "failed",
+        "failed"
+      ],
+      "error": "SideEffectThenFail: CANARY-SECRET-IN-EXCEPTION-TEXT",
+      "canary_in_output_or_error": true
+    },
+    {
+      "mechanism": "LangGraph RetryPolicy(max_attempts=3) on tools node",
+      "tool": "command",
+      "adapter": "on_tool_error=propagate + once_per_call_id",
+      "executions": 1,
+      "evaluations": 2,
+      "states": [
+        "failed"
+      ],
+      "error": null,
+      "canary_in_output_or_error": false
+    }
+  ]
+}

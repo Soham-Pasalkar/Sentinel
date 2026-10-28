@@ -1,0 +1,482 @@
+[
+  {
+    "id": "B1",
+    "title": "Authorized invocation (replacement tools, plain ToolNode)",
+    "ok": true,
+    "checks": [
+      {
+        "check": "underlying function executed exactly once",
+        "pass": true
+      },
+      {
+        "check": "exactly one gate evaluation, preceding the invocation",
+        "pass": true
+      },
+      {
+        "check": "invocation went through the proxy (exactly one proxy-execute event)",
+        "pass": true
+      },
+      {
+        "check": "graph completed without error",
+        "pass": true
+      }
+    ],
+    "observed": {
+      "counter": 1,
+      "messages": [
+        "HumanMessage 'go'",
+        "AIMessage calls=['increment'] ''",
+        "ToolMessage status=success 'incremented:a'",
+        "AIMessage 'done'"
+      ]
+    },
+    "notes": []
+  },
+  {
+    "id": "B2/B3",
+    "title": "Denied and approval-required invocation",
+    "ok": true,
+    "checks": [
+      {
+        "check": "[dangerous/tool_exception] underlying function never called",
+        "pass": true
+      },
+      {
+        "check": "[dangerous/tool_exception] gate evaluated once, no proxy execution",
+        "pass": true
+      },
+      {
+        "check": "[dangerous/raise] underlying function never called",
+        "pass": true
+      },
+      {
+        "check": "[dangerous/raise] gate evaluated once, no proxy execution",
+        "pass": true
+      },
+      {
+        "check": "[dangerous/string] underlying function never called",
+        "pass": true
+      },
+      {
+        "check": "[dangerous/string] gate evaluated once, no proxy execution",
+        "pass": true
+      },
+      {
+        "check": "[needs_approval/tool_exception] underlying function never called",
+        "pass": true
+      },
+      {
+        "check": "[needs_approval/tool_exception] gate evaluated once, no proxy execution",
+        "pass": true
+      },
+      {
+        "check": "[needs_approval/raise] underlying function never called",
+        "pass": true
+      },
+      {
+        "check": "[needs_approval/raise] gate evaluated once, no proxy execution",
+        "pass": true
+      },
+      {
+        "check": "[needs_approval/string] underlying function never called",
+        "pass": true
+      },
+      {
+        "check": "[needs_approval/string] gate evaluated once, no proxy execution",
+        "pass": true
+      }
+    ],
+    "observed": {
+      "[dangerous/tool_exception].graph_error": null,
+      "[dangerous/tool_exception].messages": [
+        "HumanMessage 'go'",
+        "AIMessage calls=['dangerous'] ''",
+        "ToolMessage status=error 'blocked: POLICY'",
+        "AIMessage 'done'"
+      ],
+      "[dangerous/raise].graph_error": "ActionDenied: POLICY",
+      "[dangerous/raise].messages": null,
+      "[dangerous/string].graph_error": null,
+      "[dangerous/string].messages": [
+        "HumanMessage 'go'",
+        "AIMessage calls=['dangerous'] ''",
+        "ToolMessage status=success 'blocked: POLICY'",
+        "AIMessage 'done'"
+      ],
+      "[needs_approval/tool_exception].graph_error": null,
+      "[needs_approval/tool_exception].messages": [
+        "HumanMessage 'go'",
+        "AIMessage calls=['needs_approval'] ''",
+        "ToolMessage status=error 'blocked: REQUIRE_APPROVAL'",
+        "AIMessage 'done'"
+      ],
+      "[needs_approval/raise].graph_error": "ApprovalRequired: REQUIRE_APPROVAL",
+      "[needs_approval/raise].messages": null,
+      "[needs_approval/string].graph_error": null,
+      "[needs_approval/string].messages": [
+        "HumanMessage 'go'",
+        "AIMessage calls=['needs_approval'] ''",
+        "ToolMessage status=success 'blocked: REQUIRE_APPROVAL'",
+        "AIMessage 'done'"
+      ]
+    },
+    "notes": []
+  },
+  {
+    "id": "B4",
+    "title": "Mismatched action at the proxy; coercion; injected arguments",
+    "ok": true,
+    "checks": [
+      {
+        "check": "decision for args A cannot execute args B",
+        "pass": true
+      },
+      {
+        "check": "decision for tool X cannot execute tool Y",
+        "pass": true
+      },
+      {
+        "check": "a DENY decision cannot be executed",
+        "pass": true
+      },
+      {
+        "check": "arguments mutated after evaluation -> blocked",
+        "pass": true
+      },
+      {
+        "check": "a decision authorizes exactly one execution (replay blocked)",
+        "pass": true
+      },
+      {
+        "check": "evaluated value equals executed value after framework coercion (design B)",
+        "pass": true
+      },
+      {
+        "check": "tool with framework-injected parameters is refused at wrap time",
+        "pass": true
+      },
+      {
+        "check": "injected-parameter detection finds none on ordinary tools",
+        "pass": true
+      }
+    ],
+    "observed": {
+      "4f.executed_received": {
+        "label": "str:'snap'"
+      },
+      "4g.model_emitted": "{'n': '5'}",
+      "4g.gate_evaluated": "{\"n\": 5}",
+      "4g.function_received": {
+        "n": "int:5"
+      },
+      "4h.refusal": "tool state_reader has framework-injected parameters: ['state']"
+    },
+    "notes": []
+  },
+  {
+    "id": "B5",
+    "title": "Unwrapped, unregistered and original-object paths",
+    "ok": true,
+    "checks": [
+      {
+        "check": "model-emitted name absent from the node is not executed",
+        "pass": true
+      },
+      {
+        "check": "[control] a node holding unwrapped tools executes with NO evaluation",
+        "pass": true
+      },
+      {
+        "check": "[control] the ORIGINAL tool object stays callable and unguarded if the developer keeps using it",
+        "pass": true
+      },
+      {
+        "check": "calling the WRAPPED tool directly is gated (unlike a ToolNode hook)",
+        "pass": true
+      },
+      {
+        "check": "wrap_tools refuses an unregistered tool at construction",
+        "pass": true
+      }
+    ],
+    "observed": {
+      "5a.unknown_name.evaluations": 0,
+      "5a.unknown_name.messages": [
+        "HumanMessage 'go'",
+        "AIMessage calls=['unwrapped'] ''",
+        "ToolMessage status=error 'Error: unwrapped is not a valid tool, try one of [increment]'",
+        "AIMessage 'done'"
+      ],
+      "5b.plain_toolnode": {
+        "invocations": 1,
+        "gate_evaluations": 0
+      },
+      "5c.original_object_invoke": {
+        "invocations": 1,
+        "gate_evaluations": 0
+      },
+      "5d.wrapped_object_direct_invoke": {
+        "invocations": 1,
+        "gate_evaluations": 1
+      },
+      "5e.construction_error": "tool not registered with the gate: unwrapped"
+    },
+    "notes": []
+  },
+  {
+    "id": "B6",
+    "title": "Framework error handling, retries, loops",
+    "ok": true,
+    "checks": [
+      {
+        "check": "[tool_exception / default handler / agent retries x3] never executed",
+        "pass": true
+      },
+      {
+        "check": "[tool_exception / handle_tool_errors=True / agent retries x3] never executed",
+        "pass": true
+      },
+      {
+        "check": "[raise / default handler / agent retries x3] never executed",
+        "pass": true
+      },
+      {
+        "check": "[raise / handle_tool_errors=True / agent retries x3] never executed",
+        "pass": true
+      },
+      {
+        "check": "[string / default handler / agent retries x3] never executed",
+        "pass": true
+      },
+      {
+        "check": "[string / handle_tool_errors=True / agent retries x3] never executed",
+        "pass": true
+      },
+      {
+        "check": "[denial raised + RetryPolicy] never executed",
+        "pass": true
+      },
+      {
+        "check": "a post-execution failure surfaced as an in-tool ToolException is NOT re-executed by RetryPolicy",
+        "pass": true
+      }
+    ],
+    "observed": {
+      "tool_exception/default handler": {
+        "graph_error": null,
+        "evaluations": 4,
+        "last_message": "ToolMessage status=error 'blocked: POLICY'"
+      },
+      "tool_exception/handle_tool_errors=True": {
+        "graph_error": null,
+        "evaluations": 4,
+        "last_message": "ToolMessage status=error 'blocked: POLICY'"
+      },
+      "raise/default handler": {
+        "graph_error": "ActionDenied: POLICY",
+        "evaluations": 1,
+        "last_message": null
+      },
+      "raise/handle_tool_errors=True": {
+        "graph_error": null,
+        "evaluations": 4,
+        "last_message": "ToolMessage status=error \"Error: ActionDenied('POLICY')\\n Please fix your mistakes.\""
+      },
+      "string/default handler": {
+        "graph_error": null,
+        "evaluations": 1,
+        "last_message": "ToolMessage status=success 'blocked: POLICY'"
+      },
+      "string/handle_tool_errors=True": {
+        "graph_error": null,
+        "evaluations": 1,
+        "last_message": "ToolMessage status=success 'blocked: POLICY'"
+      },
+      "denial_with_RetryPolicy": {
+        "graph_error": "ActionDenied: POLICY",
+        "evaluations": 3
+      },
+      "post_execution_failure[custom Exception subclass]": {
+        "graph_error": "PostExecError: post-execution failure",
+        "invocations": 3,
+        "evaluations": 3
+      },
+      "post_execution_failure[RuntimeError subclass]": {
+        "graph_error": "PostExecRuntime: post-execution failure",
+        "invocations": 1,
+        "evaluations": 1
+      },
+      "post_execution_failure[ToolException handled in-tool]": {
+        "graph_error": null,
+        "invocations": 1,
+        "evaluations": 1,
+        "messages": [
+          "HumanMessage 'go'",
+          "AIMessage calls=['increment'] ''",
+          "ToolMessage status=error 'executed; audit incomplete; output withheld'",
+          "AIMessage 'done'"
+        ]
+      }
+    },
+    "notes": []
+  },
+  {
+    "id": "B7",
+    "title": "Multiple tool calls in one step",
+    "ok": true,
+    "checks": [
+      {
+        "check": "[invoke] increment ran for exactly its 3 allowed calls",
+        "pass": true
+      },
+      {
+        "check": "[invoke] denied and approval-required never ran",
+        "pass": true
+      },
+      {
+        "check": "[invoke] 5 independent evaluations, each allow preceding its invocation",
+        "pass": true
+      },
+      {
+        "check": "[ainvoke] increment ran for exactly its 3 allowed calls",
+        "pass": true
+      },
+      {
+        "check": "[ainvoke] denied and approval-required never ran",
+        "pass": true
+      },
+      {
+        "check": "[ainvoke] 5 independent evaluations, each allow preceding its invocation",
+        "pass": true
+      }
+    ],
+    "observed": {
+      "invoke.threads": [
+        "ThreadPoolExecutor-55_0",
+        "ThreadPoolExecutor-55_1"
+      ],
+      "invoke.messages": [
+        "HumanMessage 'go'",
+        "AIMessage calls=['increment', 'dangerous', 'needs_approval', 'increment', 'increment'] ''",
+        "ToolMessage status=success 'incremented:a'",
+        "ToolMessage status=error 'blocked: POLICY'",
+        "ToolMessage status=error 'blocked: REQUIRE_APPROVAL'",
+        "ToolMessage status=success 'incremented:d'",
+        "ToolMessage status=success 'incremented:e'",
+        "AIMessage 'done'"
+      ],
+      "ainvoke.threads": [
+        "asyncio_1",
+        "asyncio_2"
+      ],
+      "ainvoke.messages": [
+        "HumanMessage 'go'",
+        "AIMessage calls=['increment', 'dangerous', 'needs_approval', 'increment', 'increment'] ''",
+        "ToolMessage status=success 'incremented:a'",
+        "ToolMessage status=error 'blocked: POLICY'",
+        "ToolMessage status=error 'blocked: REQUIRE_APPROVAL'",
+        "ToolMessage status=success 'incremented:d'",
+        "ToolMessage status=success 'incremented:e'",
+        "AIMessage 'done'"
+      ]
+    },
+    "notes": []
+  },
+  {
+    "id": "B8",
+    "title": "Boundary: which paths are intercepted (design B)",
+    "ok": true,
+    "checks": [
+      {
+        "check": "[graph.invoke] gate evaluated AND denied tool not executed",
+        "pass": true
+      },
+      {
+        "check": "[graph.stream] gate evaluated AND denied tool not executed",
+        "pass": true
+      },
+      {
+        "check": "[graph.batch] gate evaluated AND denied tool not executed",
+        "pass": true
+      },
+      {
+        "check": "[graph.ainvoke] gate evaluated AND denied tool not executed",
+        "pass": true
+      },
+      {
+        "check": "[graph.astream] gate evaluated AND denied tool not executed",
+        "pass": true
+      },
+      {
+        "check": "[wrapped_tool.invoke() directly] gate evaluated AND denied tool not executed",
+        "pass": true
+      },
+      {
+        "check": "[wrapped_tool.ainvoke() directly (no coroutine supplied)] gate evaluated AND denied tool not executed",
+        "pass": true
+      },
+      {
+        "check": "[create_react_agent(model, [wrapped tools]) - no hook configuration] gate evaluated AND denied tool not executed",
+        "pass": true
+      },
+      {
+        "check": "[tool node inside a subgraph] gate evaluated AND denied tool not executed",
+        "pass": true
+      }
+    ],
+    "observed": {
+      "ainvoke_threads": [
+        "asyncio_0"
+      ],
+      "probes": {
+        "graph.invoke": {
+          "denied_invocations": 0,
+          "evaluations": 1
+        },
+        "graph.stream": {
+          "denied_invocations": 0,
+          "evaluations": 1
+        },
+        "graph.batch": {
+          "denied_invocations": 0,
+          "evaluations": 2
+        },
+        "graph.ainvoke": {
+          "denied_invocations": 0,
+          "evaluations": 1
+        },
+        "graph.astream": {
+          "denied_invocations": 0,
+          "evaluations": 1
+        },
+        "wrapped_tool.invoke() directly": {
+          "denied_invocations": 0,
+          "evaluations": 1
+        },
+        "wrapped_tool.ainvoke() directly (no coroutine supplied)": {
+          "denied_invocations": 0,
+          "evaluations": 1
+        },
+        "create_react_agent(model, [wrapped tools]) - no hook configuration": {
+          "denied_invocations": 0,
+          "evaluations": 1
+        },
+        "tool node inside a subgraph": {
+          "denied_invocations": 0,
+          "evaluations": 1
+        },
+        "ORIGINAL tool object .invoke()": {
+          "denied_invocations": 1,
+          "evaluations": 0,
+          "note": "bypass (developer kept the original)"
+        },
+        "ORIGINAL function called directly": {
+          "denied_invocations": 1,
+          "evaluations": 0,
+          "note": "bypass"
+        }
+      }
+    },
+    "notes": []
+  }
+]

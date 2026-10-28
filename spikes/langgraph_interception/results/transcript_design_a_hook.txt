@@ -1,0 +1,124 @@
+Error in Blocker.on_tool_start callback: ActionDenied('callback says no')
+Error in Blocker.on_tool_start callback: ActionDenied('callback says no')
+python 3.11.14  langgraph 1.2.18  langchain-core 1.7.1
+
+=== E1: Authorized invocation -> PASS
+   [PASS] underlying function executed exactly once
+   [PASS] exactly one gate evaluation
+   [PASS] evaluation preceded invocation
+   [PASS] graph completed without error
+   observed invocation_counter: 1
+   observed evaluations: 1
+   observed messages: ["HumanMessage 'go'", "AIMessage calls=['increment'] ''", "ToolMessage status=success 'incremented:a'", "AIMessage 'done'"]
+
+=== E2: Denied invocation -> PASS
+   [PASS] [raise] underlying function never called
+   [PASS] [raise] gate evaluated once
+   [PASS] [message] underlying function never called
+   [PASS] [message] gate evaluated once
+   [PASS] [default-deny] tool absent from policy is not executed
+   observed raise.counter: 0
+   observed raise.graph_error: "ActionDenied: POLICY"
+   observed raise.messages: null
+   observed message.counter: 0
+   observed message.graph_error: null
+   observed message.messages: ["HumanMessage 'go'", "AIMessage calls=['dangerous'] ''", "ToolMessage status=error 'blocked: POLICY'", "AIMessage 'done'"]
+   observed default_deny.messages: ["HumanMessage 'go'", "AIMessage calls=['dangerous'] ''", "ToolMessage status=error 'blocked: UNAUTHORIZED_TOOL'", "AIMessage 'done'"]
+
+=== E3: Approval-required invocation -> PASS
+   [PASS] [raise] underlying function never called
+   [PASS] [raise] gate evaluated once
+   [PASS] [message] underlying function never called
+   [PASS] [message] gate evaluated once
+   observed raise.counter: 0
+   observed raise.graph_error: "ApprovalRequired: REQUIRE_APPROVAL"
+   observed raise.messages: null
+   observed message.counter: 0
+   observed message.graph_error: null
+   observed message.messages: ["HumanMessage 'go'", "AIMessage calls=['needs_approval'] ''", "ToolMessage status=error 'blocked: REQUIRE_APPROVAL'", "AIMessage 'done'"]
+
+=== E4: Incorrect or mismatched action -> PASS
+   [PASS] [control] framework itself does NOT stop a post-decision argument swap (documents the need for binding)
+   [PASS] [verified] swapped arguments -> blocked, function never called
+   [PASS] [control] framework executes request.tool, not the evaluated name (a different tool ran)
+   [PASS] [verified] swapped tool object -> blocked, nothing executed
+   [PASS] [control] one evaluation can be followed by two executions (single-use must be enforced by the boundary)
+   observed 4a.control_args_swapped.received: [{"label": "str:'TAMPERED'"}]
+   observed 4a.control_args_swapped.evaluations: [["increment", "5815962008dc"]]
+   observed 4b.verified_args_swapped.messages: ["HumanMessage 'go'", "AIMessage calls=['increment'] ''", "ToolMessage status=error 'blocked: ACTION_MISMATCH'", "AIMessage 'done'"]
+   observed 4c.control_tool_swapped.invoked: ["dangerous"]
+   observed 4e.control_double_execute: {"evaluations": 1, "invocations": 2}
+   observed 4f.coercion.received: [{"n": "int:5"}]
+   observed 4f.coercion.evaluated_args: "{\"n\": \"5\"}"
+   observed 4f.coercion.messages: ["HumanMessage 'go'", "AIMessage calls=['typed_count'] ''", "ToolMessage status=success 'n=5'", "AIMessage 'done'"]
+   observed 4g.injected.received: [[{"label": "str:'x'"}, ["messages"]]]
+   observed 4g.injected.gate_saw_args: "{\"label\": \"x\"}"
+
+=== E5: Unwrapped / unregistered tools -> PASS
+   [PASS] [control] a ToolNode that is not wrapped executes with NO Sentinel evaluation (unprotected path)
+   [PASS] model-emitted tool name absent from protected node is not executed
+   [PASS] tool present in node but unknown to the gate is default-denied at call time
+   [PASS] wrap_tools refuses at construction when a tool is not registered
+   [PASS] [control] calling tool.invoke() directly bypasses the boundary (not claimed as protected)
+   observed 5a.plain_toolnode: {"invocations": 1, "gate_evaluations": 0}
+   observed 5b.unknown_name.evaluations: [["unwrapped", "deny"]]
+   observed 5b.unknown_name.messages: ["HumanMessage 'go'", "AIMessage calls=['unwrapped'] ''", "ToolMessage status=error 'blocked: UNAUTHORIZED_TOOL'", "AIMessage 'done'"]
+   observed 5c.evaluations: [["unwrapped", "deny"]]
+   observed 5d.construction_error: "tools not registered with the gate: ['unwrapped']"
+   observed 5e.direct_tool_invoke: {"invocations": 1, "gate_evaluations": 0}
+   note: The stand-in `wrap_tools` covers only the tools passed to it. Nothing else is claimed protected.
+
+=== E6: Framework error handling, retries and loops -> PASS
+   [PASS] [raise, default handler] not executed
+   [PASS] [raise, handled, agent retries x3] never executed
+   [PASS] [raise, handled, agent retries x3] every retry was re-evaluated
+   [PASS] [message, agent retries x3] never executed
+   [PASS] [denial + RetryPolicy] never executed
+   observed 6a.raise_default_handler: {"graph_error": "ActionDenied: POLICY", "invocations": 0, "evaluations": 1}
+   observed 6b.raise_handled_agent_retries: {"graph_error": null, "invocations": 0, "evaluations": 4, "messages": ["HumanMessage 'go'", "AIMessage calls=['dangerous'] ''", "ToolMessage status=error \"Error: ActionDenied('POLICY')\\n Please fix your mistakes.\"", "AIMessage calls=['dangerous'] ''", "ToolMessage status=error \"Error: ActionDenied('POLICY')\\n Please fix your mistakes.\"", "AIMessage calls=['dangerous'] ''", "ToolMessage status=error \"Error: ActionDenied('POLICY')\\n Please fix your mistakes.\"", "AIMessage calls=['dangerous'] ''", "ToolMessage status=error \"Error: ActionDenied('POLICY')\\n Please fix your mistakes.\"", 
+   observed 6c.message_agent_retries: {"graph_error": null, "invocations": 0, "evaluations": 4}
+   observed 6d.denial_with_RetryPolicy: {"graph_error": "ActionDenied: POLICY", "invocations": 0, "evaluations": 3}
+   observed 6e.post_execution_failure[custom Exception subclass]: {"graph_error": "PostExecError: post-execution failure", "invocations": 3, "evaluations": 3}
+   observed 6e.post_execution_failure[RuntimeError subclass]: {"graph_error": "PostExecRuntime: post-execution failure", "invocations": 1, "evaluations": 1}
+   note: 6e shows whether a LangGraph RetryPolicy re-runs a tool whose wrapper raised AFTER execution (see observed counts).
+
+=== E7: Multiple tool calls in one step -> PASS
+   [PASS] [invoke] allowed tool ran exactly for its 3 allowed calls
+   [PASS] [invoke] denied and approval-required tools never ran
+   [PASS] [invoke] each of the 5 calls was evaluated independently
+   [PASS] [invoke] every invocation was preceded by an allow evaluation
+   [PASS] [ainvoke] allowed tool ran exactly for its 3 allowed calls
+   [PASS] [ainvoke] denied and approval-required tools never ran
+   [PASS] [ainvoke] each of the 5 calls was evaluated independently
+   [PASS] [ainvoke] every invocation was preceded by an allow evaluation
+   observed invoke.counters: {"increment": 3, "dangerous": 0, "needs_approval": 0}
+   observed invoke.threads_by_event_kind: {"evaluate": ["ThreadPoolExecutor-56_0"], "invoke": ["ThreadPoolExecutor-56_0"]}
+   observed invoke.threads: ["ThreadPoolExecutor-56_0"]
+   observed invoke.messages: ["HumanMessage 'go'", "AIMessage calls=['increment', 'dangerous', 'needs_approval', 'increment', 'increment'] ''", "ToolMessage status=success 'incremented:a'", "ToolMessage status=error 'blocked: POLICY'", "ToolMessage status=error 'blocked: REQUIRE_APPROVAL'", "ToolMessage status=success 'incremented:d'", "ToolMessage status=success 'incremented:e'", "AIMessage 'done'"]
+   observed ainvoke.counters: {"increment": 3, "dangerous": 0, "needs_approval": 0}
+   observed ainvoke.threads_by_event_kind: {"evaluate": ["MainThread"], "invoke": ["asyncio_0", "asyncio_1"]}
+   observed ainvoke.threads: ["MainThread", "asyncio_0", "asyncio_1"]
+   observed ainvoke.messages: ["HumanMessage 'go'", "AIMessage calls=['increment', 'dangerous', 'needs_approval', 'increment', 'increment'] ''", "ToolMessage status=success 'incremented:a'", "ToolMessage status=error 'blocked: POLICY'", "ToolMessage status=error 'blocked: REQUIRE_APPROVAL'", "ToolMessage status=success 'incremented:d'", "ToolMessage status=success 'incremented:e'", "AIMessage 'done'"]
+
+=== E8: Boundary: which paths are intercepted -> PASS
+   [PASS] [graph.invoke] gate evaluated AND denied tool not executed
+   [PASS] [graph.stream] gate evaluated AND denied tool not executed
+   [PASS] [graph.batch] gate evaluated AND denied tool not executed
+   [PASS] [graph.ainvoke] gate evaluated AND denied tool not executed
+   [PASS] [graph.astream] gate evaluated AND denied tool not executed
+   [PASS] [ainvoke with ONLY the sync hook installed] gate evaluated AND denied tool not executed
+   [PASS] [tool node inside a subgraph] gate evaluated AND denied tool not executed
+   observed sync_path_without_sync_hook: {"denied_tool_invocations": 1, "evaluations": 0, "intercepted": false, "blocked": false, "note": "sync path with no sync hook"}
+   observed callback_blocking_is_reliable: false
+   observed probes: {"graph.invoke": {"denied_tool_invocations": 0, "evaluations": 1, "intercepted": true, "blocked": true, "note": ""}, "graph.stream": {"denied_tool_invocations": 0, "evaluations": 1, "intercepted": true, "blocked": true, "note": ""}, "graph.batch": {"denied_tool_invocations": 0, "evaluations": 2, "intercepted": true, "blocked": true, "note": ""}, "graph.ainvoke": {"denied_tool_invocations": 0, "evaluations": 1, "intercepted": true, "blocked": true, "note": ""}, "graph.astream": {"denied_tool_invocations": 0, "evaluations": 1, "intercepted": true, "blocked": true, "note": ""}, "ainvoke with ONLY
+   note: Intercepted = the gate was evaluated. 'blocked' only counts when the denied tool never ran.
+
+=== E8b: Prebuilt agent, official hook, versions, deprecations -> PASS
+   [PASS] every installed LangGraph component supports Python 3.11 (D-01)
+   [PASS] create_react_agent given our wrapped ToolNode does not execute the denied tool
+   observed package_metadata: {"langgraph": {"version": "1.2.18", "requires_python": ">=3.10"}, "langgraph-prebuilt": {"version": "1.1.1", "requires_python": ">=3.10"}, "langchain-core": {"version": "1.7.1", "requires_python": "<4.0.0,>=3.10.0"}, "langgraph-checkpoint": {"version": "4.3.1", "requires_python": ">=3.10"}}
+   observed create_react_agent_with_prebuilt_ToolNode: {"error": null, "denied_tool_invocations": 0, "evaluations": 1, "messages": ["HumanMessage 'go'", "AIMessage calls=['dangerous'] ''", "ToolMessage status=error 'blocked: POLICY'", "AIMessage 'done'"]}
+   observed deprecation_warnings: ["LangGraphDeprecatedSinceV10: create_react_agent has been moved to `langchain.agents`. Please update your import to `from langchain.agents i"]
+   observed official_hook: "ToolNode(wrap_tool_call=..., awrap_tool_call=...) in langgraph.prebuilt.tool_node (present)"
+
+REQUIRED CHECKS: ALL PASS

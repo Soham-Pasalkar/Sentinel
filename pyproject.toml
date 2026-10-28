@@ -50,7 +50,9 @@ target-version = "py311"
 src = ["src", "tests"]
 # Ruff also formats code blocks inside Markdown. The build brief and the design
 # documents are reference material and must not be rewritten by tooling.
-extend-exclude = ["SENTINEL_BUILD_BRIEF.md", "docs"]
+# `spikes/` holds throwaway framework experiments (C-02, C-02b), not production
+# code; it is excluded from routine linting per decision D-28.
+extend-exclude = ["SENTINEL_BUILD_BRIEF.md", "docs", "spikes"]
 
 [tool.ruff.lint]
 select = [
