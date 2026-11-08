@@ -33,7 +33,7 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 | Decisions | **NFR-002 (no SQLAlchemy), D-09, D-11, D-20 (audit writes), D-24f, D-24i modules approved**; C-09 interpretations I-18–I-23 | `5d6ce77` |
 | C-09 | Audit store [`src/sentinel/store.py`](../../src/sentinel/store.py) and logger [`src/sentinel/audit.py`](../../src/sentinel/audit.py); 182 tests | `8379e47` |
 | Decisions | **D-16, D-20 approved**; I-8–I-23 confirmed; C-11 interpretations I-24–I-31 | `eebfcc4` |
-| C-11 | Pipeline [`src/sentinel/pipeline.py`](../../src/sentinel/pipeline.py), `config.py`, `detector.py`; C-10 fix I-30; 116 tests | the C-11 commit after `eebfcc4` (see `git log`) |
+| C-11 | Pipeline [`src/sentinel/pipeline.py`](../../src/sentinel/pipeline.py), `config.py`, `detector.py`; C-10 fix I-30; 116 tests | `625970a` |
 
 ## 3. Repository state (verified 2026-11-08)
 
@@ -61,7 +61,7 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
   - run 42463102989 on `cc27883` (C-08): 546 passed, 1 xfailed per job;
   - run 42465473430 on `708745d` (C-10): 635 passed, 1 xfailed per job;
   - run 42467083583 on `8379e47` (C-09): 817 passed, 1 xfailed per job;
-  - **the C-11 commit's run must be checked** (`gh run list --branch c01-project-scaffold`).
+  - run 42469205994 on `625970a` (C-11): 933 passed, 1 xfailed per job.
 
 ## 5. Decisions
 
@@ -116,7 +116,7 @@ C-12 (public client, quickstart, README; closes M1) depends on C-11 (done). It i
 - **Audit limits:** append-only through Sentinel's API only. Anyone with write access to the file, or privileged in-process code, can change or delete rows; there is no tamper evidence (hash-chaining is post-v1). Masking is heuristic and cannot recognise every secret (for example, a token with an unexpected shape). Durability depends on the filesystem honouring `fsync`. Writes are serialized per store; several processes on one file rely only on SQLite's locking and are not supported. No migrations: a schema mismatch refuses the store.
 - **Pipeline limits:** after a failed audit write no further events are written for that request (I-25). An in-memory store never reports a complete audit, so outputs are never released with `:memory:`. The best-effort interruption record runs synchronously and briefly on the event loop, as C1.6 prescribes. A sync tool reached through the async entry runs in a worker thread that cannot be cancelled; its audit completes when it ends. No exactly-once external side effects; no OS sandboxing.
 - **Not yet in place:**
-  - remote CI verified through C-09; confirm the C-11 run (see §4);
+  - remote CI verified through C-11 (see §4);
   - no mypy, coverage or Hypothesis (D-22 remainder).
 - **Doc housekeeping still open:**
   - §15 of `testing_strategy.md` still shows PROD-TODO for the C-03 model parts of AT-36, AT-40, AT-41, AT-44 and AT-46. Trace each to a named test before marking it.

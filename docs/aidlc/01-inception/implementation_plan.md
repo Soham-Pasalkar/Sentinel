@@ -313,7 +313,7 @@
 
 ### C-12 — Public client, quickstart, README (closes M1)
 - **Scope:** `client.py` (`SentinelClient`, `register_tool`, `register_agent`, `evaluate_request`, `audit_events`); `__all__` (no proxy); `examples/quickstart.py`; README (status table, limitations from `decision_record.md` §2/§4.6/§6, decisions link).
-- **Dependencies:** C-11. **Blocked by:** D-17, D-24i.
+- **Dependencies:** C-11. **Blocked by:** D-17, D-24i. **Rev. 22: both Approved; C-12 may start.** Interpretations I-32 to I-35 (decision record, D-24) fill the remaining gaps. **G-M1 note:** the gate requires NFR-006 coverage, and C-12 evidence lists mypy and coverage output; neither tool is an approved dev dependency (D-22 remainder), so that part of the gate cannot be met until D-22 is decided.
 - **Acceptance:** E2E-01 … E2E-09 through `SentinelClient`; the quickstart exits 0 and its subprocess test passes; `__all__` test. **Rev. 4:** AT-34 (no public async entry on `SentinelClient`).
 - **Tests:** `e2e/test_client.py`, `e2e/test_quickstart.py`. **Evidence:** pytest, ruff, mypy and coverage outputs; quickstart output.
 
@@ -426,3 +426,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 19 | C-09 implemented: `store.py`, `audit.py`, two exceptions, 182 tests |
 | 20 | D-16 and D-20 Approved; I-8 to I-23 confirmed; C-11 unblocked |
 | 21 | C-11 implemented: `pipeline.py`, `config.py`, `detector.py`, C-10 fix I-30, 116 tests |
+| 22 | D-17 and D-24i class name Approved; C-12 unblocked; G-M1 coverage/mypy dependency on D-22 noted |

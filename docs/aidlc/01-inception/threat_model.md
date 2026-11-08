@@ -5,7 +5,7 @@
 | Phase | Inception (initial model; revisit at the end of M1, M2 and M5) |
 | Date | 2026-10-28 |
 | Method | Asset- and attacker-centred threat enumeration over the enforcement sequence in `architecture_assessment.md` §4, with STRIDE categories as a checklist |
-| Status | Draft rev. 11 — pending owner review. **Rev. 11** (2026-11-08, D-16 and D-20 Approved) notes pipeline ownership of the audit in T-09 and cancellation handling in T-19. **Rev. 10** (2026-11-08, D-09, D-11, D-20, D-24f Approved) notes the audit-store decisions in T-08 and T-09. **Rev. 9** (2026-11-08, D-19 and D-31 defaults Approved) notes guard defaults and process-local scope in T-17, T-18 and T-21, and the filter-failure rule in T-16. **Rev. 8** (2026-11-08, D-24a and D-15 Approved) notes in T-04 that no detector result is ever an authorization. **Rev. 7** (2026-11-08, D-24b Approved) notes in T-02 that grants are tool-level. Rev. 6 — **Rev. 6** (Q-03c) updates the T-16 mitigation wording. *Rev. 5* added the T-03 credentials note (header not updated at the time). Rev. 4 updates T-17 and T-18 and adds T-21. Rev. 2 updated T-03, T-06, T-07, T-09, T-11, T-12. **Rev. 3** (after C-02/C-02b) updates T-12 and adds T-17–T-20, for the contracts in [`decision_record.md`](decision_record.md) C1.4, C1.6, C3.5, C3.6 |
+| Status | Draft rev. 12 — pending owner review. **Rev. 12** (2026-11-08, D-17 Approved) notes the public audit read API in T-08 and T-15. **Rev. 11** (2026-11-08, D-16 and D-20 Approved) notes pipeline ownership of the audit in T-09 and cancellation handling in T-19. **Rev. 10** (2026-11-08, D-09, D-11, D-20, D-24f Approved) notes the audit-store decisions in T-08 and T-09. **Rev. 9** (2026-11-08, D-19 and D-31 defaults Approved) notes guard defaults and process-local scope in T-17, T-18 and T-21, and the filter-failure rule in T-16. **Rev. 8** (2026-11-08, D-24a and D-15 Approved) notes in T-04 that no detector result is ever an authorization. **Rev. 7** (2026-11-08, D-24b Approved) notes in T-02 that grants are tool-level. Rev. 6 — **Rev. 6** (Q-03c) updates the T-16 mitigation wording. *Rev. 5* added the T-03 credentials note (header not updated at the time). Rev. 4 updates T-17 and T-18 and adds T-21. Rev. 2 updated T-03, T-06, T-07, T-09, T-11, T-12. **Rev. 3** (after C-02/C-02b) updates T-12 and adds T-17–T-20, for the contracts in [`decision_record.md`](decision_record.md) C1.4, C1.6, C3.5, C3.6 |
 
 ## 1. System under analysis
 
@@ -114,6 +114,7 @@ An in-process Python library sitting between agent frameworks and registered too
 - **Requirements:** SEC-018.
 - **Tests:** repository introspection (no update/delete); documentation review.
 - **Rev. 10 (D-09, D-24f Approved):** the store is append-only through Sentinel's API only. SQLite offers no tamper evidence, and anyone with write access to the file, or privileged in-process code, can alter or delete rows. Hash-chaining is post-v1.
+- **Rev. 12 (D-17 Approved):** the only public access to the audit is `SentinelClient.audit_events`: read-only, at most 1,000 events per call, already-masked detail as JSON text, no path, connection, SQL or mutation method. It reads the local file through Sentinel's own connection; it is not an access-control boundary for the file itself.
 - **Residual:** **high against AT5/AT6.** There is no tamper evidence in v1. Hash-chaining or an external append-only sink is post-v1 hardening.
 
 ### T-09 — Audit storage failure
@@ -176,6 +177,7 @@ An in-process Python library sitting between agent frameworks and registered too
 - **Mitigations:** generic messages for `INTERNAL_ERROR`; reason codes but no policy contents in results (SEC-009).
 - **Requirements:** SEC-009, NFR-010.
 - **Tests:** fault-injection results contain no stack text or paths.
+- **Rev. 12:** `audit_events` returns the stored, masked detail. Anything masking did not recognise when the event was written (heuristic, I-18) is visible to whoever can call the client.
 - **Residual:** low. Reason codes reveal coarse policy structure (accepted).
 
 ### T-16 — Fail-open through misconfiguration or internal error
