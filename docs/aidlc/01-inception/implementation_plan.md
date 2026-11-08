@@ -255,6 +255,16 @@
 - **Acceptance:** NI-08, NI-09, NI-13; F14, F16; tool error → `failed` with no message; filter error → withheld. **Rev. 3:** NI-16; AT-01, AT-02, AT-03 (including the non-atomic test double that must fail), AT-06, AT-07, AT-22, AT-23, AT-25 (proxy part), AT-26 (capacity fails closed, no eviction), **AT-30 (guard part), AT-35** (rev. 4).
 - **Tests:** `unit/test_proxy.py`, `security/test_action_integrity.py`, `integration/test_proxy_filesystem.py`, **`security/test_claim_concurrency.py`, `unit/test_tool_call_guard.py`** (rev. 3).
 - **Invariants:** SEC-002, SEC-003, SEC-010, SEC-011, SEC-017, SEC-021, **SEC-024, SEC-025**. **Evidence:** pytest output, including repeated runs of the concurrency tests.
+- **Rev. 17 status: implemented (2026-11-08).**
+  - Code: `src/sentinel/proxy.py` (internal). `ExecutionProxy(registry, *, output_filter, guard=None)`; `claim(request, decision, context, *, mode="sync"|"async") -> ProxyRun`; `ProxyRun.execute()` / `await ProxyRun.execute_async()` / `abandon()`, with `state` and `outcome`; `ToolCallGuard(*, ttl_seconds=300.0, capacity=10_000, clock=time.monotonic)` with `claim(key)` and `retire(key)`; `ProxyOutcome(error_code, execution, output_released, output, diagnostics)`; `Diagnostics` (D-29 fields); `pass_through_filter`.
+  - Order: in `claim`, the registry lookup and entry-point check (`INTERNAL_ERROR`), the binding checks (`ACTION_MISMATCH`), the single-use claim keyed by the action digest (`DECISION_ALREADY_USED`), and the guard claim on `(agent_id, session_id, tool_call_id)` (`DUPLICATE_TOOL_CALL`, `GUARD_CAPACITY_EXHAUSTED`). In `execute`, `paths.reverify` for every registry `path_args` value (`RESTRICTED_PATH`), the `entered` flag, the call with a fresh copy of the action's arguments, tool errors (`TOOL_FAILED`, `failed`), the output filter (`OUTPUT_FILTER_FAILED` with `succeeded`, output withheld, D-19), and guard retirement on every terminal state (completed, failed, interrupted, not started after the claim). A `BaseException` after entry sets `interrupted` and propagates.
+  - Tests are in one file, `tests/unit/test_proxy.py`, not the separate files listed above; the content they name (action integrity, claim concurrency, guard, real-filesystem path checks) is covered there.
+  - Tests: 89, covering NI-08, NI-09, NI-13, NI-16, F14, F16, AT-01–AT-03, AT-06, AT-07 (proxy part), AT-22, AT-23 (sync), AT-26, AT-35, D-19, interruption and cancellation. They were also run against 36 deliberately broken versions (binding, single use, guard key, expiry, eviction, purge, clock rollback, configuration, path re-check, filter, execution states, interruption, run lifecycle, diagnostics). Results:
+    - one real gap closed: no test covered the async path's re-check;
+    - one hanging test fixed: the cancellation test could wait forever;
+    - three survivors are behaviour-equivalent: the request-id and tool checks are implied by the digest comparison, and the `authorized` check by the model rule that an unauthorized context has no envelope.
+  - Evidence: local macOS, Python 3.11.14: 635 passed, 1 xfailed (also with `RuntimeWarning` as an error, so no coroutine is left un-awaited); Ruff and format clean; `pip check` clean. Remote CI: see the C-10 commit's run.
+  - Not in C-10: audit events, `PipelineResult` mapping, the worker-thread placement of blocking stages for the async entry (C-11, D-30); real output filtering (C-14); the adapter's use of `tool_call_id` (C-16).
 
 ### C-11 — Pipeline orchestration
 - **Scope:** `pipeline.py` (sole orchestrator and sole audit writer, C4.3 order, C1.7 behaviour, C1.8 error mapping); `config.py`; `detector.py` stub (`[]`). **Rev. 3:** the async entry (FR-026; name and visibility D-30) with blocking stages in a worker thread; interruption handling (best-effort `REQUEST_COMPLETED(unknown)`, re-raise); no re-invocation of a claimed request (C1.7).
@@ -373,3 +383,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 14 | D-24a and D-15 Approved, I-1 to I-7 confirmed; C-08 unblocked |
 | 15 | C-08 implemented: `policy.py`, 96 tests |
 | 16 | D-19 failure rule and D-31 defaults Approved; C-10 unblocked |
+| 17 | C-10 implemented: `proxy.py`, 89 tests |

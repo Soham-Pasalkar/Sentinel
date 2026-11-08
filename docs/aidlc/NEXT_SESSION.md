@@ -1,6 +1,6 @@
 # Sentinel — Next-Session Resume Note
 
-Updated 2026-11-08 after C-08. This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
+Updated 2026-11-08 after C-10. This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
 
 ## 1. Purpose and architecture (brief)
 
@@ -8,7 +8,7 @@ Sentinel is a planned in-process Python library that sits between AI agents and 
 
 Planned pipeline (decision record C1–C4): gateway → identity and grants → heuristic detection → deterministic policy → proxy (the sole executor) → output filtering. The pipeline is the sole audit writer. Framework integration is Design B, `wrap_tools` (D-12).
 
-**What exists today is the contract layer, the path guard, the tool registry, the request gateway, identity with tool-level grants, and the policy engine. No runtime enforcement exists yet:** no proxy, audit store, pipeline, client API or adapter exists to act on a decision. Sentinel protects no tool call today. The only public attribute is `sentinel.__version__`.
+**What exists today is the contract layer, the path guard, the tool registry, the request gateway, identity with tool-level grants, the policy engine and the execution proxy. They are not yet connected:** no pipeline (C-11) runs them in order, writes the audit (C-09) or returns a `PipelineResult`, and there is no client API or framework adapter. So Sentinel still protects no real tool call end to end. Sentinel protects no tool call today. The only public attribute is `sentinel.__version__`.
 
 ## 2. Completed increments
 
@@ -28,10 +28,12 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 | C-07 | Identity and grants [`src/sentinel/identity.py`](../../src/sentinel/identity.py), four models in `models.py`; 97 tests | `25dad4f` |
 | Decisions | **D-24a, D-15 approved**; I-1–I-7 confirmed; C-08 interpretations I-8–I-11 | `deab308` |
 | C-08 | Policy engine [`src/sentinel/policy.py`](../../src/sentinel/policy.py); 96 tests | `cc27883` |
+| Decisions | **D-19 failure rule, D-31 defaults approved**; D-31 contract reaffirmed; C-10 interpretations I-12–I-17 | `65a4550` |
+| C-10 | Execution proxy [`src/sentinel/proxy.py`](../../src/sentinel/proxy.py); 89 tests | the C-10 commit after `65a4550` (see `git log`) |
 
 ## 3. Repository state (verified 2026-11-08)
 
-- **Branch:** `c01-project-scaffold`. HEAD is the C-08 commit on top of `deab308` (see `git log -3`); compare with the remote before starting.
+- **Branch:** `c01-project-scaffold`. HEAD is the C-10 commit on top of `65a4550` (see `git log -3`); compare with the remote before starting.
 - **Remote:** `https://github.com/Soham-Pasalkar/Sentinel`, branch `c01-project-scaffold` (pushed with owner authorization; compare with `git fetch origin && git status -sb`).
   - The repository is **public**.
   - Because the repository was empty, GitHub made `c01-project-scaffold` the **default branch**.
@@ -42,17 +44,18 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 
 | Command | Result |
 |---|---|
-| `pytest` | **546 passed, 1 xfailed** (F15, strict). Per file: action 52, models 70, exceptions 12, scaffold 3, path guard 57, registry 52, gateway 108, identity 97, policy 96 |
-| `ruff check .` / `ruff format --check .` | clean / 19 files formatted |
+| `pytest` | **635 passed, 1 xfailed** (F15, strict). Per file: action 52, models 70, exceptions 12, scaffold 3, path guard 57, registry 52, gateway 108, identity 97, policy 96, proxy 89 |
+| `ruff check .` / `ruff format --check .` | clean / 21 files formatted |
 | `python -m pip check` | no broken requirements |
 
-- **Mutation checks:** path guard: 16 of 16 broken copies caught. Registry: 13 of 14 caught. Gateway: every behaviour change caught. Identity: 26 of 26 after two gaps were closed. Policy: every behaviour change caught after one gap (case-sensitive matching) was closed. The remaining survivors are behaviour-equivalent (implementation plan, C-05 to C-07).
+- **Mutation checks:** path guard: 16 of 16 broken copies caught. Registry: 13 of 14 caught. Gateway: every behaviour change caught. Identity: 26 of 26 after two gaps were closed. Policy: every behaviour change caught after one gap (case-sensitive matching) was closed. Proxy: 36 broken versions; every behaviour change caught after one gap (async path re-check) was closed and one hanging test was fixed. The remaining survivors are behaviour-equivalent (implementation plan, C-05 to C-07).
 - **GitHub Actions (remote evidence):** every job passed in both runs, Ruff (lint and format) plus pytest on `ubuntu-latest` and `macos-latest` × Python 3.11, 3.12, 3.13, with no skips:
   - run 42456322322 on `fb4be1b` (through C-04): 193 passed, 1 xfailed per job;
   - run 42456612529 on `95a11c5` (C-05): 245 passed, 1 xfailed per job;
   - run 42457691978 on `124fb2e` (C-06): 353 passed, 1 xfailed per job;
   - run 42461535297 on `25dad4f` (C-07): 450 passed, 1 xfailed per job;
-  - run 42463102989 on `cc27883` (C-08): 546 passed, 1 xfailed per job.
+  - run 42463102989 on `cc27883` (C-08): 546 passed, 1 xfailed per job;
+  - **the C-10 commit's run must be checked** (`gh run list --branch c01-project-scaffold`).
 
 ## 5. Decisions
 
@@ -74,14 +77,14 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 
 ## 6. Next increment: blocked on owner decisions
 
-Every remaining increment needs at least one unapproved decision (implementation plan, §3):
+The next increments, per implementation plan §3:
 - **C-09 (audit store):** depends only on C-03. Blocked by the **SQLAlchemy part of NFR-002** (a new runtime dependency), **D-09** (v1 persistence model), **D-11** (audit storage default), **D-20** (concurrency), **D-24f** (audit wording) and the **D-24i** module name (`audit.py`). D-29 is approved.
-- **C-10 (proxy):** depends on C-03, C-04, C-05 and C-08 (all done). Blocked by **D-19** (output-filter failure rule) and the **D-31 default TTL and capacity** for the `tool_call_id` guard. D-14 is approved.
-- **C-11 (pipeline):** needs C-06 to C-10; also D-16 and D-20.
+- **C-11 (pipeline):** needs C-06 to C-10 (C-09 is the only one missing), plus **D-16** (orchestrator and sole audit writer) and **D-20**. D-30 is approved (internal async entry). C-11 connects gateway → identity → detector stub → policy → proxy → audit and maps outcomes to `PipelineResult`.
+- C-12 (client) needs C-11, D-17 and the D-24i class name.
 
-**Also for the owner:** confirm or amend the C-08 interpretations I-8 to I-11 (decision record, under D-24): reason codes `DESTRUCTIVE_TOOL` / `ALLOWED`, the action as a keyword-only input, inconsistent inputs raised, `risk_score` not computed.
+**Also for the owner:** confirm or amend the C-08 interpretations I-8 to I-11 and the C-10 interpretations I-12 to I-17 (decision record, under D-24).
 
-**Most useful owner action:** decide D-19 and the D-31 defaults, which opens C-10, the first component that executes tools. C-09 can proceed in parallel once its decisions and the SQLAlchemy dependency are approved.
+**Most useful owner action:** decide the C-09 set (SQLAlchemy dependency, D-09, D-11, D-20, D-24f, D-24i module name). That unblocks C-09, and with D-16 also C-11, the first end-to-end enforcement.
 
 ## 7. Security constraints not to forget
 
@@ -95,18 +98,19 @@ Every remaining increment needs at least one unapproved decision (implementation
 
 ## 8. Known limitations and gaps
 
-- **No enforcement yet.** The path guard, registry, gateway, identity store and policy engine have no pipeline calling them, and no proxy acts on a decision.
+- **No end-to-end enforcement yet.** The components exist but no pipeline (C-11) connects them or writes the audit.
 - **Function level only so far:**
   - F7–F9 are now refused by the gateway; reporting them as `decision=None` is the pipeline (C-11);
-  - F14 and F16 at the proxy, with spy counts (C-10);
+  - F14 and F16 now also at the proxy, with spy counts (`test_proxy.py`);
   - F19 is now a policy DENY (`test_empty_prefix_list_denies_every_path`); end-to-end needs C-11.
 - **Path guard limits** (documented, not defended): the window after `reverify` (F15, strict xfail); hard links (F17); paths a tool derives internally; case differences, which fail closed; mount boundaries. It is not a sandbox.
 - **Registry limits:** entry points are checked by kind only (sync vs coroutine function), not by signature against the schema, which is not a documented rule. A callable object with an `async __call__` is refused as an async entry point (fails closed). The registry is in-memory and per instance; "no mutation reachable from the tool-call path" (SEC-014) also depends on C-10 and C-11 passing it read-only use only.
 - **Gateway limits:** schema validators see the original path, and the canonical path is not validated a second time (D-08: one validation). The action holds the caller's validated values, not a model dump, so a schema that transforms values cannot change what executes. Spec tension for C-16: FR-021 `session_id=None` vs the required `session_id` (FR-001, `SecurityRequest`).
 - **Identity limits:** credentials are plain SHA-256 digests, which suits high-entropy tokens such as API keys, not passwords. The constant-time comparison is best effort (a dict lookup still precedes it). Grants are tool-level (D-24b), so a granted tool is trusted with everything its validated arguments allow (T-02). Rate-limited grants are refused until C-15. Agents are registered once, with no disable-later or rotation API.
 - **Policy limits:** rate limits (row 5) are not evaluated until C-15; `risk_score` is not computed (no approved formula); a `ToolSpec` with the right name but wrong metadata cannot be detected by policy, because the pipeline must pass the registry's spec (D-15). A decision is not enforcement until the proxy (C-10) executes only `decision.action` after re-verification.
+- **Proxy limits:** both guards are process-local (not shared across workers or hosts); single-use claims are kept for the proxy's lifetime, so memory grows with executed requests; a `tool_call_id` repeat more than 300 s after the first call finished is treated as new; path re-checks narrow but do not close the race before the tool's own `open`; the output filter is a pass-through until C-14; the proxy cannot re-derive the destructive-approval requirement (policy's, with the registry spec). Sync tools run on the calling thread; nothing is offloaded.
 - **Not yet in place:**
-  - remote CI verified through C-08 (see §4);
+  - remote CI verified through C-08; confirm the C-10 run (see §4);
   - no mypy, coverage or Hypothesis (D-22 remainder).
 - **Doc housekeeping still open:**
   - §15 of `testing_strategy.md` still shows PROD-TODO for the C-03 model parts of AT-36, AT-40, AT-41, AT-44 and AT-46. Trace each to a named test before marking it.
@@ -116,11 +120,11 @@ Every remaining increment needs at least one unapproved decision (implementation
 
 ```bash
 cd /path/to/Sentinel
-git status --short && git log --oneline -3    # expect the C-08 commit (or later)
+git status --short && git log --oneline -3    # expect the C-10 commit (or later)
 git fetch origin && git status -sb             # compare with the remote branch
 source .venv/bin/activate                      # recreate only with owner approval:
 # python3.11 -m venv .venv && python -m pip install -e ".[dev]" -c constraints-dev.txt
-pytest                                         # expect 546 passed, 1 xfailed at the C-08 commit
+pytest                                         # expect 635 passed, 1 xfailed at the C-10 commit
 ruff check . && ruff format --check .
 python -m pip check
 gh run list --repo Soham-Pasalkar/Sentinel --branch c01-project-scaffold   # CI result for the branch
