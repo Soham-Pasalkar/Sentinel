@@ -51,7 +51,7 @@
 - C-04 ← D-05, D-18, D-21 (**all Approved, rev. 8**);
 - C-09 ← D-09, D-11, D-24f (D-29 Approved); **rev. 18: D-09, D-11, D-24f, D-20 (audit writes) and the D-24i module names Approved; no SQLAlchemy (NFR-002).**
 - C-10 ← D-14, D-19, **D-31 default values** (TTL, capacity) (D-07, D-25, D-27, D-31 Approved); **rev. 16: D-19 failure rule and D-31 defaults Approved (TTL 300 s after the terminal state, 10,000 entries).**
-- C-11 ← D-16, D-20 (D-30 Approved: internal entry);
+- C-11 ← D-16, D-20 (D-30 Approved: internal entry); **rev. 20: D-16 and D-20 Approved.**
 - C-16 ← D-04 (D-12, D-26, D-30, D-31 and FR-022 Approved). **Implementing first and deciding later is not permitted** for these.
 
 ## 3. Increments
@@ -290,7 +290,7 @@
 
 ### C-11 — Pipeline orchestration
 - **Scope:** `pipeline.py` (sole orchestrator and sole audit writer, C4.3 order, C1.7 behaviour, C1.8 error mapping); `config.py`; `detector.py` stub (`[]`). **Rev. 3:** the async entry (FR-026; name and visibility D-30) with blocking stages in a worker thread; interruption handling (best-effort `REQUEST_COMPLETED(unknown)`, re-raise); no re-invocation of a claimed request (C1.7).
-- **Dependencies:** C-06 … C-10. **Blocked by:** D-03, D-16, D-20 (D-30 Approved in rev. 4: the async entry is **internal**, not in any `__all__`; acceptance adds **AT-34**).
+- **Dependencies:** C-06 … C-10. **Blocked by:** D-03, D-16, D-20 (D-30 Approved in rev. 4: the async entry is **internal**, not in any `__all__`; acceptance adds **AT-34**). **Rev. 20: all Approved; C-11 may start.** Interpretations I-24 to I-31 (decision record, D-24) fill the remaining gaps; I-30 is a narrow fix to C-10 (`execute_async` re-checks paths in a worker thread).
 - **Acceptance:** E2E-01 … E2E-09 at pipeline level; full §6 fault-injection matrix; NI-01 … NI-15; canary test. **Rev. 3:** NI-17, NI-18; AT-02 (async path), AT-08, AT-09, AT-10, AT-24 (pipeline part), AT-25. **Rev. 6:** NI-05 (revised), NI-19; AT-40, AT-41, AT-43.
 - **Tests:** `integration/test_audit_ordering.py`, `integration/test_audit_reconstruction.py`, `security/test_fault_injection.py`, `security/test_invariants.py`, `security/test_secret_canary.py`.
 - **Invariants:** SEC-005, SEC-006, SEC-009, SEC-022, SEC-023. **Evidence:** pytest output including the security-suite summary.
@@ -408,3 +408,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 17 | C-10 implemented: `proxy.py`, 89 tests |
 | 18 | NFR-002 (no SQLAlchemy), D-09, D-11, D-20 (audit writes), D-24f and D-24i module names Approved; C-09 unblocked |
 | 19 | C-09 implemented: `store.py`, `audit.py`, two exceptions, 182 tests |
+| 20 | D-16 and D-20 Approved; I-8 to I-23 confirmed; C-11 unblocked |

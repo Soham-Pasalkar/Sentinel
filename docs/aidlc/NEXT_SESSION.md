@@ -31,7 +31,7 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 | Decisions | **D-19 failure rule, D-31 defaults approved**; D-31 contract reaffirmed; C-10 interpretations I-12–I-17 | `65a4550` |
 | C-10 | Execution proxy [`src/sentinel/proxy.py`](../../src/sentinel/proxy.py); 89 tests | `708745d` |
 | Decisions | **NFR-002 (no SQLAlchemy), D-09, D-11, D-20 (audit writes), D-24f, D-24i modules approved**; C-09 interpretations I-18–I-23 | `5d6ce77` |
-| C-09 | Audit store [`src/sentinel/store.py`](../../src/sentinel/store.py) and logger [`src/sentinel/audit.py`](../../src/sentinel/audit.py); 182 tests | the C-09 commit after `5d6ce77` (see `git log`) |
+| C-09 | Audit store [`src/sentinel/store.py`](../../src/sentinel/store.py) and logger [`src/sentinel/audit.py`](../../src/sentinel/audit.py); 182 tests | `8379e47` |
 
 ## 3. Repository state (verified 2026-11-08)
 
@@ -58,7 +58,7 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
   - run 42461535297 on `25dad4f` (C-07): 450 passed, 1 xfailed per job;
   - run 42463102989 on `cc27883` (C-08): 546 passed, 1 xfailed per job;
   - run 42465473430 on `708745d` (C-10): 635 passed, 1 xfailed per job;
-  - **the C-09 commit's run must be checked** (`gh run list --branch c01-project-scaffold`).
+  - run 42467083583 on `8379e47` (C-09): 817 passed, 1 xfailed per job.
 
 ## 5. Decisions
 
@@ -112,7 +112,7 @@ C-11 depends on C-06 to C-10, all done. It is blocked by **D-16** (pipeline as s
 - **Proxy limits:** both guards are process-local (not shared across workers or hosts); single-use claims are kept for the proxy's lifetime, so memory grows with executed requests; a `tool_call_id` repeat more than 300 s after the first call finished is treated as new; path re-checks narrow but do not close the race before the tool's own `open`; the output filter is a pass-through until C-14; the proxy cannot re-derive the destructive-approval requirement (policy's, with the registry spec). Sync tools run on the calling thread; nothing is offloaded.
 - **Audit limits:** append-only through Sentinel's API only. Anyone with write access to the file, or privileged in-process code, can change or delete rows; there is no tamper evidence (hash-chaining is post-v1). Masking is heuristic and cannot recognise every secret (for example, a token with an unexpected shape). Durability depends on the filesystem honouring `fsync`. Writes are serialized per store; several processes on one file rely only on SQLite's locking and are not supported. No migrations: a schema mismatch refuses the store.
 - **Not yet in place:**
-  - remote CI verified through C-10; confirm the C-09 run (see §4);
+  - remote CI verified through C-09 (see §4);
   - no mypy, coverage or Hypothesis (D-22 remainder).
 - **Doc housekeeping still open:**
   - §15 of `testing_strategy.md` still shows PROD-TODO for the C-03 model parts of AT-36, AT-40, AT-41, AT-44 and AT-46. Trace each to a named test before marking it.

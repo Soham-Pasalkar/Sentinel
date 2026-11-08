@@ -1,9 +1,9 @@
-# Requirements Specification — Sentinel v1 (AI-DLC Inception, rev. 16)
+# Requirements Specification — Sentinel v1 (AI-DLC Inception, rev. 18)
 
 | | |
 |---|---|
 | Phase | Inception, revised in Phase 1.5 (decision lock) and after the C-02/C-02b review (rev. 3) |
-| Date | 2026-10-28 (rev. 1–8); 2026-11-08 (rev. 9–16) |
+| Date | 2026-10-28 (rev. 1–8); 2026-11-08 (rev. 9–18) |
 | Owner | Soham Pasalkar |
 | Status | **Draft.** Requirements marked `Approved` derive directly from owner-approved decisions (`decision_record.md` §12); all others are `Proposed` or `Pending`. Contracts are defined in [`decision_record.md`](decision_record.md) (C1–C4); decisions are D-01 … D-31 |
 
@@ -117,7 +117,7 @@
 | NFR-013 | Packaging: editable install, wheel build, fresh-venv import smoke test. | MUST | BRIEF §11 | Pending D-02 (names provisional; verification open) | T | CI step. |
 | NFR-014 | API clarity: one public entry class, explicit `__all__`, keyword-only security flags. | SHOULD | NEW | Proposed | I | API review at C-12. |
 | NFR-015 | No circular imports; dependency direction per architecture §3. | MUST | NEW | Proposed | T | Per-module fresh-interpreter import test. |
-| NFR-016 | Thread-safe synchronous use **and asyncio-safe async use** (rev. 3) within one process; blocking pipeline I/O never runs on the event loop. | SHOULD | NEW; C-02, C-02b | Pending D-20 (claim part Approved as D-25) | T | 8 threads × 200 requests and 8 tasks × 200 requests: no errors; expected audit row count; no unauthorized ALLOW; thread-identity assertion for pipeline I/O. |
+| NFR-016 | Thread-safe synchronous use **and asyncio-safe async use** (rev. 3) within one process; blocking pipeline I/O never runs on the event loop. | SHOULD | NEW; C-02, C-02b | Approved (D-20, rev. 18; the D-25 claim rule was already Approved) | T | 8 threads × 200 requests and 8 tasks × 200 requests: no errors; expected audit row count; no unauthorized ALLOW; thread-identity assertion for pipeline I/O. |
 | NFR-017 | Audit field truncation (default 1,024 characters, marked). *Rev. 16: bounds per interpretation I-18/I-19 (decision record D-24).* | SHOULD | NEW | Proposed | T | 1 MB argument → bounded stored value. |
 | NFR-018 | Dependency version bounds; CI installs from constraints. | SHOULD | NEW | Proposed | I | Review at C-01. |
 | NFR-019 | **Framework test baseline (rev. 3):** integration tests run against pinned framework versions, starting from the spike baseline (`langchain` 1.4.7, `langgraph` 1.2.18, `langgraph-prebuilt` 1.1.1, `langchain-core` 1.7.1). Supported version ranges are declared in an optional extra, never in runtime dependencies. | SHOULD | C-02, C-02b | Proposed | I, T | Integration CI job installs from a constraints file; a version outside the tested range is documented as unsupported. |
@@ -163,3 +163,4 @@ Contract → requirement → test: `decision_record.md` §5 and `testing_strateg
 | 15 | 2026-11-08 | C-10 implemented and tested at unit level (`test_proxy.py`): SEC-010, SEC-011, SEC-021, SEC-024, SEC-025 proxy parts; FR-015 M1 stage (pass-through, fail closed). End-to-end acceptance (audit sequences, `PipelineResult`) needs C-11 |
 | 16 | 2026-11-08 | NFR-002 settled without SQLAlchemy; D-09, D-11, D-24f Approved; D-20 Approved for audit writes; D-24i module names Approved (decision record §12). **Approved:** FR-012, FR-024, SEC-005, SEC-018, SEC-023; NFR-002 revised. Implementation statuses unchanged until C-09 tests exist |
 | 17 | 2026-11-08 | C-09 implemented and tested at unit and integration level: FR-012 (event types and C4.2 columns), FR-024 (durable default, `:memory:` warning), SEC-018 (insert and read only), SEC-023 (C4.4 reconstruction), NFR-017 (bounds), SEC-008 audit sink (masking; heuristic). SEC-005/SEC-006 need the pipeline (C-11) |
+| 18 | 2026-11-08 | D-16 Approved; D-20 Approved in full (asyncio-safe pipeline); I-8 to I-23 confirmed (decision record §12). **Approved:** NFR-016. Implementation statuses unchanged until C-11 tests exist |
