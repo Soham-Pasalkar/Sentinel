@@ -49,7 +49,7 @@
 **Security contracts that must be Approved before the increment that encodes them** (see "Blocked by" in each increment). Rev. 3 list, updated in rev. 4 (D-07, D-29, D-30, D-31 now Approved):
 - C-03 ← D-03, D-04, D-06, D-08, D-14 (remainder), D-15, D-24c, D-24d, **D-24i** (added in rev. 4; D-24b too if `ToolGrant` stays in C-03). Authoritative checklist: `decision_record.md` §8.6;
 - C-04 ← D-05, D-18, D-21 (**all Approved, rev. 8**);
-- C-09 ← D-09, D-11, D-24f (D-29 Approved);
+- C-09 ← D-09, D-11, D-24f (D-29 Approved); **rev. 18: D-09, D-11, D-24f, D-20 (audit writes) and the D-24i module names Approved; no SQLAlchemy (NFR-002).**
 - C-10 ← D-14, D-19, **D-31 default values** (TTL, capacity) (D-07, D-25, D-27, D-31 Approved); **rev. 16: D-19 failure rule and D-31 defaults Approved (TTL 300 s after the terminal state, 10,000 entries).**
 - C-11 ← D-16, D-20 (D-30 Approved: internal entry);
 - C-16 ← D-04 (D-12, D-26, D-30, D-31 and FR-022 Approved). **Implementing first and deciding later is not permitted** for these.
@@ -233,7 +233,7 @@
 
 ### C-09 — Audit store and logger
 - **Scope:** `store.py` (`audit_events` table per C4.2, insert and read only, `schema_version` check, WAL + `synchronous=FULL`, default `sentinel_audit.db` resolved at construction); `audit.py` (`AuditLogger.record`, masking, truncation, commit per event, masked `logging` fallback); `reconstruct()` helper implementing C4.4 (also used by tests). **Rev. 3:** failure diagnostics per D-29 (type, module, stage, location; no message text by default); `REQUEST_COMPLETED(execution="unknown")` support; `reconstruct()` handles `unknown`.
-- **Dependencies:** C-03. **Blocked by:** D-09, D-11, D-20, D-24f, D-29.
+- **Dependencies:** C-03. **Blocked by:** D-09, D-11, D-20, D-24f, D-29. **Rev. 18: all Approved (D-20 for audit writes); C-09 may start.** Persistence uses the standard-library `sqlite3` (NFR-002, rev. 16). Interpretations I-18 to I-23 (decision record, D-24) fill the remaining gaps.
 - **Acceptance:** a committed row is visible through a second connection on return; no update/delete; masking and truncation; schema-version mismatch → writes refused; default path created at construction (not import) and logged; `:memory:` → warning; 8-thread inserts consistent.
 - **Tests:** `unit/test_audit_repository.py`, `unit/test_masking.py`, `integration/test_audit_storage_default.py`, `unit/test_reconstruction.py`.
 - **Invariants:** SEC-018, SEC-008 (audit sink), FR-024. **Rev. 3 acceptance:** AT-12 (audit part). **Rev. 4 (D-29 Approved):** structured diagnostics only (type, module, function, line, stage, `request_id`, tool, `error_code`); no message text, traceback text, locals, argument values or absolute paths; no opt-in in v1 → **AT-32, AT-33**. **Evidence:** pytest output.
@@ -384,3 +384,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 15 | C-08 implemented: `policy.py`, 96 tests |
 | 16 | D-19 failure rule and D-31 defaults Approved; C-10 unblocked |
 | 17 | C-10 implemented: `proxy.py`, 89 tests |
+| 18 | NFR-002 (no SQLAlchemy), D-09, D-11, D-20 (audit writes), D-24f and D-24i module names Approved; C-09 unblocked |

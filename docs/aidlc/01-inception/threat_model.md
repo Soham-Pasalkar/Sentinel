@@ -5,7 +5,7 @@
 | Phase | Inception (initial model; revisit at the end of M1, M2 and M5) |
 | Date | 2026-10-28 |
 | Method | Asset- and attacker-centred threat enumeration over the enforcement sequence in `architecture_assessment.md` §4, with STRIDE categories as a checklist |
-| Status | Draft rev. 9 — pending owner review. **Rev. 9** (2026-11-08, D-19 and D-31 defaults Approved) notes guard defaults and process-local scope in T-17, T-18 and T-21, and the filter-failure rule in T-16. **Rev. 8** (2026-11-08, D-24a and D-15 Approved) notes in T-04 that no detector result is ever an authorization. **Rev. 7** (2026-11-08, D-24b Approved) notes in T-02 that grants are tool-level. Rev. 6 — **Rev. 6** (Q-03c) updates the T-16 mitigation wording. *Rev. 5* added the T-03 credentials note (header not updated at the time). Rev. 4 updates T-17 and T-18 and adds T-21. Rev. 2 updated T-03, T-06, T-07, T-09, T-11, T-12. **Rev. 3** (after C-02/C-02b) updates T-12 and adds T-17–T-20, for the contracts in [`decision_record.md`](decision_record.md) C1.4, C1.6, C3.5, C3.6 |
+| Status | Draft rev. 10 — pending owner review. **Rev. 10** (2026-11-08, D-09, D-11, D-20, D-24f Approved) notes the audit-store decisions in T-08 and T-09. **Rev. 9** (2026-11-08, D-19 and D-31 defaults Approved) notes guard defaults and process-local scope in T-17, T-18 and T-21, and the filter-failure rule in T-16. **Rev. 8** (2026-11-08, D-24a and D-15 Approved) notes in T-04 that no detector result is ever an authorization. **Rev. 7** (2026-11-08, D-24b Approved) notes in T-02 that grants are tool-level. Rev. 6 — **Rev. 6** (Q-03c) updates the T-16 mitigation wording. *Rev. 5* added the T-03 credentials note (header not updated at the time). Rev. 4 updates T-17 and T-18 and adds T-21. Rev. 2 updated T-03, T-06, T-07, T-09, T-11, T-12. **Rev. 3** (after C-02/C-02b) updates T-12 and adds T-17–T-20, for the contracts in [`decision_record.md`](decision_record.md) C1.4, C1.6, C3.5, C3.6 |
 
 ## 1. System under analysis
 
@@ -113,6 +113,7 @@ An in-process Python library sitting between agent frameworks and registered too
 - **Mitigations:** deterministic: the repository exposes insert and read only (SEC-018). The documentation does not claim immutability.
 - **Requirements:** SEC-018.
 - **Tests:** repository introspection (no update/delete); documentation review.
+- **Rev. 10 (D-09, D-24f Approved):** the store is append-only through Sentinel's API only. SQLite offers no tamper evidence, and anyone with write access to the file, or privileged in-process code, can alter or delete rows. Hash-chaining is post-v1.
 - **Residual:** **high against AT5/AT6.** There is no tamper evidence in v1. Hash-chaining or an external append-only sink is post-v1 hardening.
 
 ### T-09 — Audit storage failure
@@ -121,6 +122,7 @@ An in-process Python library sitting between agent frameworks and registered too
 - **Mitigations (deterministic):** pre-execution events committed before invocation, failure ⇒ not invoked (SEC-005); post-execution failure behaviour (SEC-006, CF-09); no silent in-memory default (OD-07).
 - **Requirements:** SEC-005, SEC-006.
 - **Tests:** fault injection on each audit write; committed-before-execution check through a second connection.
+- **Rev. 10 (D-09, D-11, D-20 Approved):** every event is committed (WAL, `synchronous=FULL`) before `record` returns; a failed write raises `AuditUnavailableError` and is never treated as success, with a masked `logging` record as best effort only. Writes are serialized by one lock per store; multi-process coordination is only what SQLite's own file locking provides. Durability depends on the filesystem honouring `fsync`.
 - **Residual:** when post-execution audit fails, the side effect has already happened. Availability trades off against auditability (Sentinel denies when audit is down).
 - **Rev. 2:** EXECUTION_STARTED is committed before invocation, so the audit distinguishes "never invoked" (guaranteed) from "invoked, outcome unknown" after a crash (C4.4, NI-15). A post-execution audit failure is returned truthfully (`execution="succeeded"`, `audit_complete=False`, output withheld; D-03), never as a DENY. The default store is a durable SQLite file with WAL and `synchronous=FULL` (D-11).
 

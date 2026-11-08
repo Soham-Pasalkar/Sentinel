@@ -29,7 +29,7 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 | Decisions | **D-24a, D-15 approved**; I-1–I-7 confirmed; C-08 interpretations I-8–I-11 | `deab308` |
 | C-08 | Policy engine [`src/sentinel/policy.py`](../../src/sentinel/policy.py); 96 tests | `cc27883` |
 | Decisions | **D-19 failure rule, D-31 defaults approved**; D-31 contract reaffirmed; C-10 interpretations I-12–I-17 | `65a4550` |
-| C-10 | Execution proxy [`src/sentinel/proxy.py`](../../src/sentinel/proxy.py); 89 tests | the C-10 commit after `65a4550` (see `git log`) |
+| C-10 | Execution proxy [`src/sentinel/proxy.py`](../../src/sentinel/proxy.py); 89 tests | `708745d` |
 
 ## 3. Repository state (verified 2026-11-08)
 
@@ -55,7 +55,7 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
   - run 42457691978 on `124fb2e` (C-06): 353 passed, 1 xfailed per job;
   - run 42461535297 on `25dad4f` (C-07): 450 passed, 1 xfailed per job;
   - run 42463102989 on `cc27883` (C-08): 546 passed, 1 xfailed per job;
-  - **the C-10 commit's run must be checked** (`gh run list --branch c01-project-scaffold`).
+  - run 42465473430 on `708745d` (C-10): 635 passed, 1 xfailed per job.
 
 ## 5. Decisions
 
@@ -110,7 +110,7 @@ The next increments, per implementation plan §3:
 - **Policy limits:** rate limits (row 5) are not evaluated until C-15; `risk_score` is not computed (no approved formula); a `ToolSpec` with the right name but wrong metadata cannot be detected by policy, because the pipeline must pass the registry's spec (D-15). A decision is not enforcement until the proxy (C-10) executes only `decision.action` after re-verification.
 - **Proxy limits:** both guards are process-local (not shared across workers or hosts); single-use claims are kept for the proxy's lifetime, so memory grows with executed requests; a `tool_call_id` repeat more than 300 s after the first call finished is treated as new; path re-checks narrow but do not close the race before the tool's own `open`; the output filter is a pass-through until C-14; the proxy cannot re-derive the destructive-approval requirement (policy's, with the registry spec). Sync tools run on the calling thread; nothing is offloaded.
 - **Not yet in place:**
-  - remote CI verified through C-08; confirm the C-10 run (see §4);
+  - remote CI verified through C-10 (see §4);
   - no mypy, coverage or Hypothesis (D-22 remainder).
 - **Doc housekeeping still open:**
   - §15 of `testing_strategy.md` still shows PROD-TODO for the C-03 model parts of AT-36, AT-40, AT-41, AT-44 and AT-46. Trace each to a named test before marking it.
