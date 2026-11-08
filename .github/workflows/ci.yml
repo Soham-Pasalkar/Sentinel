@@ -2,7 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # `c01-project-scaffold` is the current development branch; there is no
+    # `main` yet. A pull request from it would also run the pull_request
+    # trigger below, so expect two runs for the same commit in that case.
+    branches: [main, c01-project-scaffold]
   pull_request:
 
 permissions:
