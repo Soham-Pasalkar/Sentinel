@@ -15,7 +15,7 @@ At this stage the repository holds only the package scaffold, development toolin
 | Request validation (gateway) | implemented (internal, not exported; C-06): request shape, registered tool, reserved identity keys, strict schema validation, canonical paths, action candidate. Not yet called by any pipeline |
 | Identity and capability grants | implemented (internal, not exported; C-07): agent registry with per-agent credentials (digest only, `require_credentials=True` by default), tool-level grants (D-24b), path prefixes via the path guard. Produces authentication facts; no policy decisions yet |
 | Filesystem path authorization | path guard implemented (internal, not exported; C-04): canonicalisation, containment, prefix registration, re-verification. Not yet used by any gateway, policy or proxy, so it enforces nothing yet |
-| Policy engine | not started |
+| Policy engine | implemented (internal, not exported; C-08): deterministic, default-deny C1.5 rows 1–4, 6, 7 with explicit `tool_spec` (D-15); decisions bound to the exact action. Rate limits (row 5) not yet; nothing executes decisions yet |
 | Tool registry and execution proxy | tool registry implemented (internal, not exported; C-05): unique names, required schema and `destructive`, sync/async entry points, Windows refusal of path tools. Execution proxy not started |
 | Audit log | not started |
 | Pipeline and public client API | not started |
