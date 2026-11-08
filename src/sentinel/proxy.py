@@ -35,6 +35,7 @@ This module is internal.
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import math
 import threading
@@ -424,7 +425,9 @@ class ProxyRun:
         """Run an async tool, awaited on the caller's event loop."""
         tool, action = self._start("async")
         try:
-            if not self._paths_unchanged(tool, action):
+            # Filesystem re-resolution runs off the event loop (D-20, C3.5
+            # rule 6; I-30), immediately before the tool is entered.
+            if not await asyncio.to_thread(self._paths_unchanged, tool, action):
                 return self._finish("not_started", _refused(RESTRICTED_PATH))
             fn = tool.async_fn
             arguments = action.arguments  # a fresh copy (C1.4 rule 3)

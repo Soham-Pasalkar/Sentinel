@@ -294,6 +294,22 @@
 - **Acceptance:** E2E-01 … E2E-09 at pipeline level; full §6 fault-injection matrix; NI-01 … NI-15; canary test. **Rev. 3:** NI-17, NI-18; AT-02 (async path), AT-08, AT-09, AT-10, AT-24 (pipeline part), AT-25. **Rev. 6:** NI-05 (revised), NI-19; AT-40, AT-41, AT-43.
 - **Tests:** `integration/test_audit_ordering.py`, `integration/test_audit_reconstruction.py`, `security/test_fault_injection.py`, `security/test_invariants.py`, `security/test_secret_canary.py`.
 - **Invariants:** SEC-005, SEC-006, SEC-009, SEC-022, SEC-023. **Evidence:** pytest output including the security-suite summary.
+- **Rev. 21 status: implemented (2026-11-08). The first end-to-end runtime path.**
+  - `src/sentinel/pipeline.py` (internal): `Pipeline(*, registry, identity, policy, audit, proxy, detector=None, clock, new_request_id)` with `evaluate(raw) -> PipelineResult`, `await evaluate_async(raw) -> PipelineResult` (internal, D-30), `close()`, and the `registry`, `identity` and `audit` properties. `build_pipeline(config, *, registry, policy, output_filter, detector=None, clock)` builds one long-lived store, logger, identity store, guard and proxy. `src/sentinel/config.py`: `SentinelConfig` (I-31). `src/sentinel/detector.py`: `NullDetector`.
+  - Flow:
+    - `_prepare` writes REQUEST_RECEIVED; validates (C-06); authenticates (C-07); writes IDENTITY_RESOLVED; detects; writes FINDING×n; decides (C-08); writes DECISION;
+    - non-ALLOW → REQUEST_COMPLETED;
+    - ALLOW → `proxy.claim` (refusal → REQUEST_COMPLETED(None, code)) → EXECUTION_STARTED (on failure, `run.abandon()`);
+    - then `run.execute()` / `await run.execute_async()` / a worker-thread `run.execute()` (I-27);
+    - `_complete` writes [ERROR] [OUTPUT_FILTERED | ERROR, OUTPUT_WITHHELD] REQUEST_COMPLETED and builds the result.
+  - Failure mapping: C1.6–C1.8 and testing §6; I-24 (reason with `AUDIT_UNAVAILABLE`), I-25 (no writes after a failure; durable store needed for `audit_complete`), I-26 (ERROR events), I-28/I-29 (cancellation and interruption).
+  - C-10 fix I-30: `ProxyRun.execute_async` re-checks paths in a worker thread.
+  - Tests (116): `tests/integration/test_audit_ordering.py` (22: E2E-01…E2E-09, NI-06, AT-25), `tests/integration/test_audit_reconstruction.py` (10: NI-15), `tests/integration/test_pipeline_async.py` (13: thread placement, loop responsiveness, AT-08, AT-09, shared guard across sync and async, NFR-016 at 8 threads × 200 and 8 tasks × 200, AT-34), `tests/security/test_fault_injection.py` (29: the full §6 matrix, every audit write, AT-40, AT-43, AT-45), `tests/security/test_invariants.py` (23: NI-01…NI-19 over 20 scenarios), `tests/security/test_secret_canary.py` (2: NI-11), `tests/unit/test_pipeline_config.py` (17).
+  - Also run against 28 deliberately broken versions (audit gating, abandon, refusal and internal-error mapping, release rules, durability, ERROR events, interruption, each async boundary, the I-30 fix). The first run left three survivors:
+    - two were real gaps, now tested: nothing is claimed after a failed DECISION write; a proxy refusal with a failed completion still has `decision=None`;
+    - one is behaviour-equivalent: ignoring a failed REQUEST_RECEIVED gives the same result through I-25.
+  - Evidence: local macOS, Python 3.11.14: 933 passed, 1 xfailed (also with `RuntimeWarning` as an error); Ruff and format clean; `pip check` clean. Remote CI: see the C-11 commit's run.
+  - Not in C-11: the public `SentinelClient` and `audit_events()` (C-12); detection (C-13); real output filtering (C-14); rate limits (C-15); the adapter (C-16).
 
 ### C-12 — Public client, quickstart, README (closes M1)
 - **Scope:** `client.py` (`SentinelClient`, `register_tool`, `register_agent`, `evaluate_request`, `audit_events`); `__all__` (no proxy); `examples/quickstart.py`; README (status table, limitations from `decision_record.md` §2/§4.6/§6, decisions link).
@@ -409,3 +425,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 18 | NFR-002 (no SQLAlchemy), D-09, D-11, D-20 (audit writes), D-24f and D-24i module names Approved; C-09 unblocked |
 | 19 | C-09 implemented: `store.py`, `audit.py`, two exceptions, 182 tests |
 | 20 | D-16 and D-20 Approved; I-8 to I-23 confirmed; C-11 unblocked |
+| 21 | C-11 implemented: `pipeline.py`, `config.py`, `detector.py`, C-10 fix I-30, 116 tests |
