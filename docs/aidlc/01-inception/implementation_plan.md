@@ -171,6 +171,12 @@
 - **Tests:** `unit/test_path_guard.py`; optional Hypothesis property test (accepted ⇒ contained by component).
 - **Security invariants:** SEC-007.
 - **Evidence:** pytest output from both OSes.
+- **Rev. 8 status: implemented (2026-11-08); macOS evidence only, Linux NOT_VERIFIED.**
+  - Code: `src/sentinel/paths.py` (internal, not exported): `canonicalise`, `is_contained`, `register_prefixes` (the prefix registration helper; warns on empty or missing prefixes and on the root prefix), `reverify` (the C2.7 re-resolution used by the proxy in C-10), `require_path_support` (D-21 Windows refusal, used by the registry in C-05).
+  - Tests: `tests/unit/test_path_guard.py`, 57 tests (56 pass, F15 strict xfail). The tests were also run against deliberately broken copies of the module (string-prefix containment, relative paths resolved, no re-resolution equality, no warnings, chained `OSError`, no Windows refusal, single string accepted as a prefix list, and others): every mutant fails at least one test.
+  - Evidence (macOS, Python 3.11.14, project `.venv`): full suite 193 passed, 1 xfailed; `ruff check .` clean; `ruff format --check .` clean; `pip check` clean.
+  - CI: `ubuntu-latest` and `macos-latest` added to the test matrix (D-21). The workflow triggers only on pushes to `main` and on pull requests, so **no CI run exists yet**; Linux evidence remains outstanding.
+  - Function-level only (callers come later): F7/F8/F9 raise `InvalidRequestError` (C-06 maps it to `decision=None`, `INVALID_REQUEST`); F14/F16 via `reverify` (proxy wiring and spy counts in C-10); F19 as "contains nothing" plus the warning (policy DENY in C-08). The optional Hypothesis test is not written (Hypothesis not approved, D-22).
 
 ### C-05 — Tool registry
 - **Scope:** `registry.py`: register (unique; `arg_schema` and `destructive` required; `path_args` ⊆ schema `str` fields; refuses path tools on Windows), lookup of `(ToolSpec, callable)`, read-only spec listing. **Rev. 3:** a registration holds a sync callable, an async callable, or both, and the registry reports which entry points a tool supports.
@@ -332,3 +338,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 6 | Q-03c resolved (internal errors → `decision=None`, `INTERNAL_ERROR`; not denials): C-03 scope and blockers, C-11 and C-16 acceptance updated. Full C-03 still requires the owner's explicit gate approval. C-03a unchanged |
 | 7 | Owner: operational refusals are not policy decisions; C-03 approved with `ToolGrant` excluded (four models moved to C-07); C-03 blocked on the Pydantic runtime dependency (options A/B in decision record §8.6); C-10 guard wording |
 | 8 | D-05, D-18, D-21 Approved (decision record rev. 8); C-04 and C-05 gates updated; stale C-01-only and "not committed" status lines corrected (C-03a and C-03 are in `153df80`) |
+| 9 | C-04 implemented: `paths.py`, 57 tests; CI matrix adds `macos-latest`; Linux evidence outstanding |

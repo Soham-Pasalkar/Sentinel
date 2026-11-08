@@ -14,7 +14,7 @@ At this stage the repository holds only the package scaffold, development toolin
 | Core models and contracts | implemented (internal, not exported): action record and digest (C-03a), models and exceptions (C-03) |
 | Request validation (gateway) | not started |
 | Identity and capability grants | not started |
-| Filesystem path authorization | not started |
+| Filesystem path authorization | path guard implemented (internal, not exported; C-04): canonicalisation, containment, prefix registration, re-verification. Not yet used by any gateway, policy or proxy, so it enforces nothing yet |
 | Policy engine | not started |
 | Tool registry and execution proxy | not started |
 | Audit log | not started |
@@ -39,13 +39,14 @@ Even when implemented, Sentinel will be an in-process Python library. In particu
 
 - It can only constrain tool calls that are routed through it. Code in the same process can bypass it.
 - Prompt-injection and sensitive-data detection will be heuristic. They reduce risk; they do not prevent prompt injection.
-- Path checks will authorize path arguments. They are not filesystem isolation.
+- Path checks will authorize path arguments. They are not filesystem isolation or a sandbox: a symlink swapped after the final check, and hard links, are not detected.
+- Path-constrained tools are supported on Linux and macOS only; registering one on Windows is refused.
 
 The full list is in the decision register.
 
 ## Requirements
 
-- Python 3.11 or newer. CI is configured to test 3.11, 3.12 and 3.13; it has not yet run on GitHub.
+- Python 3.11 or newer. CI is configured to test 3.11, 3.12 and 3.13 on Linux (`ubuntu-latest`) and macOS (`macos-latest`); it has not yet run on GitHub.
 
 ## Local development setup
 
