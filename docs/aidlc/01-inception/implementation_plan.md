@@ -237,6 +237,28 @@
 - **Acceptance:** a committed row is visible through a second connection on return; no update/delete; masking and truncation; schema-version mismatch → writes refused; default path created at construction (not import) and logged; `:memory:` → warning; 8-thread inserts consistent.
 - **Tests:** `unit/test_audit_repository.py`, `unit/test_masking.py`, `integration/test_audit_storage_default.py`, `unit/test_reconstruction.py`.
 - **Invariants:** SEC-018, SEC-008 (audit sink), FR-024. **Rev. 3 acceptance:** AT-12 (audit part). **Rev. 4 (D-29 Approved):** structured diagnostics only (type, module, function, line, stage, `request_id`, tool, `error_code`); no message text, traceback text, locals, argument values or absolute paths; no opt-in in v1 → **AT-32, AT-33**. **Evidence:** pytest output.
+- **Rev. 19 status: implemented (2026-11-08).**
+  - `src/sentinel/store.py` (internal): `AuditStore(path="sentinel_audit.db", *, busy_timeout_seconds=5.0)` with `insert(row) -> seq`, `read(request_id=None) -> tuple[AuditRow, ...]` (ordered by `seq`), `close()`, `path`, `durable`; `AuditRow` (the 15 C4.2 columns); `COLUMNS`, `SCHEMA_VERSION = 1`, `DEFAULT_AUDIT_DB_PATH`, `MEMORY`. Standard-library `sqlite3`, one connection per store under one lock, WAL, `synchronous=FULL`, `BEGIN IMMEDIATE` / `COMMIT` per insert, `PRAGMA user_version` plus the per-row column (I-20).
+  - `src/sentinel/audit.py` (internal): `AuditLogger(store, *, clock, max_chars=1024).record(event_type, *, request_id, agent_id, session_id, tool, decision, reason, policy_version, action_digest, execution, detail) -> AuditRow`; the nine C4.3 event constants; `mask()`; `diagnostics_detail()`; `reconstruct(rows) -> dict[str, RequestState]`. The field rules are I-22, masking and bounds I-18/I-19, reconstruction C4.4 plus I-23.
+  - `src/sentinel/exceptions.py`: `AuditUnavailableError` (`error_code = "AUDIT_UNAVAILABLE"`) and `AuditIntegrityError` (I-21).
+  - Tests (182): `tests/unit/test_audit_repository.py` (70), `tests/unit/test_masking.py` (66), `tests/unit/test_reconstruction.py` (39), `tests/integration/test_audit_storage_default.py` (7).
+  - Coverage includes:
+    - the exact C4.2 schema, refused versions, columns and indexes, and a schema change while open;
+    - WAL and `synchronous=FULL`, and visibility through a second connection after each commit;
+    - an SQL trace showing only `BEGIN`, `PRAGMA`, `INSERT`, `SELECT` and `COMMIT` run;
+    - 8 real writer threads × 50 events, with no loss, no duplicate ids and per-writer order kept;
+    - faults: a locked database, a closed store, write, read and connection failures, a read-only file, a missing directory (not created) and a non-database file;
+    - masked fallback logging, and a fallback failure that never hides the error;
+    - the field rules (refusal never DENY, an entered tool never `not_started`);
+    - masking (key names, token shapes, `SecretStr`, nesting, no mutation), bounds (1,024 characters with marker, 100 items, depth 8, 1 MB input) and AT-32 with a module at an absolute path;
+    - every C4.4 row and 17 inconsistent sequences;
+    - the default file at construction (none at import), resolution at construction, survival across reopening, and `:memory:` warned and not durable.
+  - Also run against 39 deliberately broken versions of the store and logger. The first run left five survivors:
+    - three were real gaps, now tested: SQLite refusing WAL; wrong columns with the right index; chained connection errors;
+    - one was a weak test, strengthened: masking before truncation;
+    - one is behaviour-equivalent: a closed store still raises `AuditUnavailableError` through SQLite.
+  - Evidence: local macOS, Python 3.11.14: 817 passed, 1 xfailed; Ruff and format clean; `pip check` clean. Remote CI: see the C-09 commit's run.
+  - Not in C-09: writing events from a pipeline, the SEC-005/SEC-006 fault matrix end to end, `audit_complete` in results, `audit_events()` on the client (C-11, C-12); hash-chaining (post-v1).
 
 ### C-10 — Tool proxy with output-filter stage
 - **Scope:** `proxy.py`: binding checks (ALLOW, matching `request_id`s, digest); proxy re-resolution (C2.7); `entered` flag; invoke `fn(**deepcopy(action.arguments))`; tool-error containment; output-filter stage (pass-through) with fail-closed handling. Returns a `ToolResult`-level outcome the pipeline maps to C1.6.
@@ -385,3 +407,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 16 | D-19 failure rule and D-31 defaults Approved; C-10 unblocked |
 | 17 | C-10 implemented: `proxy.py`, 89 tests |
 | 18 | NFR-002 (no SQLAlchemy), D-09, D-11, D-20 (audit writes), D-24f and D-24i module names Approved; C-09 unblocked |
+| 19 | C-09 implemented: `store.py`, `audit.py`, two exceptions, 182 tests |

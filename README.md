@@ -17,7 +17,7 @@ At this stage the repository holds only the package scaffold, development toolin
 | Filesystem path authorization | path guard implemented (internal, not exported; C-04): canonicalisation, containment, prefix registration, re-verification. Not yet used by any gateway, policy or proxy, so it enforces nothing yet |
 | Policy engine | implemented (internal, not exported; C-08): deterministic, default-deny C1.5 rows 1–4, 6, 7 with explicit `tool_spec` (D-15); decisions bound to the exact action. Rate limits (row 5) not yet; nothing executes decisions yet |
 | Tool registry and execution proxy | tool registry implemented (internal, not exported; C-05): unique names, required schema and `destructive`, sync/async entry points, Windows refusal of path tools. Execution proxy implemented (internal; C-10): the only invoker of tools, with exact-action binding, single-use decisions, the `tool_call_id` guard (TTL 300 s after completion, 10,000 entries, process-local), path re-checks before invocation and a fail-closed output-filter stage (pass-through until C-14). Not yet connected to a pipeline or audit log (C-11) |
-| Audit log | not started |
+| Audit log | implemented (internal; C-09): append-only `audit_events` table in SQLite (standard-library `sqlite3`, WAL, `synchronous=FULL`, one commit per event, serialized writes), durable `sentinel_audit.db` by default, heuristic masking and truncation, D-29 diagnostics, C4.4 reconstruction. Append-only through Sentinel's API only, not tamper-proof. Not yet written by a pipeline (C-11) |
 | Pipeline and public client API | not started |
 | Threat detection (heuristic) | not started |
 | Output filtering | not started |

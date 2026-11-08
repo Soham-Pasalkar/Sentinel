@@ -1,6 +1,6 @@
 # Sentinel — Next-Session Resume Note
 
-Updated 2026-11-08 after C-10. This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
+Updated 2026-11-08 after C-09. This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
 
 ## 1. Purpose and architecture (brief)
 
@@ -8,7 +8,7 @@ Sentinel is a planned in-process Python library that sits between AI agents and 
 
 Planned pipeline (decision record C1–C4): gateway → identity and grants → heuristic detection → deterministic policy → proxy (the sole executor) → output filtering. The pipeline is the sole audit writer. Framework integration is Design B, `wrap_tools` (D-12).
 
-**What exists today is the contract layer, the path guard, the tool registry, the request gateway, identity with tool-level grants, the policy engine and the execution proxy. They are not yet connected:** no pipeline (C-11) runs them in order, writes the audit (C-09) or returns a `PipelineResult`, and there is no client API or framework adapter. So Sentinel still protects no real tool call end to end. Sentinel protects no tool call today. The only public attribute is `sentinel.__version__`.
+**What exists today is the contract layer, the path guard, the tool registry, the request gateway, identity with tool-level grants, the policy engine, the execution proxy and the audit store and logger. They are not yet connected:** no pipeline (C-11) runs them in order, writes audit events or returns a `PipelineResult`, and there is no client API or framework adapter. So Sentinel still protects no real tool call end to end. Sentinel protects no tool call today. The only public attribute is `sentinel.__version__`.
 
 ## 2. Completed increments
 
@@ -30,10 +30,12 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 | C-08 | Policy engine [`src/sentinel/policy.py`](../../src/sentinel/policy.py); 96 tests | `cc27883` |
 | Decisions | **D-19 failure rule, D-31 defaults approved**; D-31 contract reaffirmed; C-10 interpretations I-12–I-17 | `65a4550` |
 | C-10 | Execution proxy [`src/sentinel/proxy.py`](../../src/sentinel/proxy.py); 89 tests | `708745d` |
+| Decisions | **NFR-002 (no SQLAlchemy), D-09, D-11, D-20 (audit writes), D-24f, D-24i modules approved**; C-09 interpretations I-18–I-23 | `5d6ce77` |
+| C-09 | Audit store [`src/sentinel/store.py`](../../src/sentinel/store.py) and logger [`src/sentinel/audit.py`](../../src/sentinel/audit.py); 182 tests | the C-09 commit after `5d6ce77` (see `git log`) |
 
 ## 3. Repository state (verified 2026-11-08)
 
-- **Branch:** `c01-project-scaffold`. HEAD is the C-10 commit on top of `65a4550` (see `git log -3`); compare with the remote before starting.
+- **Branch:** `c01-project-scaffold`. HEAD is the C-09 commit on top of `5d6ce77` (see `git log -3`); compare with the remote before starting.
 - **Remote:** `https://github.com/Soham-Pasalkar/Sentinel`, branch `c01-project-scaffold` (pushed with owner authorization; compare with `git fetch origin && git status -sb`).
   - The repository is **public**.
   - Because the repository was empty, GitHub made `c01-project-scaffold` the **default branch**.
@@ -44,18 +46,19 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 
 | Command | Result |
 |---|---|
-| `pytest` | **635 passed, 1 xfailed** (F15, strict). Per file: action 52, models 70, exceptions 12, scaffold 3, path guard 57, registry 52, gateway 108, identity 97, policy 96, proxy 89 |
-| `ruff check .` / `ruff format --check .` | clean / 21 files formatted |
+| `pytest` | **817 passed, 1 xfailed** (F15, strict). Per file: action 52, models 70, exceptions 12, scaffold 3, path guard 57, registry 52, gateway 108, identity 97, policy 96, proxy 89, audit repository 70, masking 66, reconstruction 39, storage default (integration) 7 |
+| `ruff check .` / `ruff format --check .` | clean / 27 files formatted |
 | `python -m pip check` | no broken requirements |
 
-- **Mutation checks:** path guard: 16 of 16 broken copies caught. Registry: 13 of 14 caught. Gateway: every behaviour change caught. Identity: 26 of 26 after two gaps were closed. Policy: every behaviour change caught after one gap (case-sensitive matching) was closed. Proxy: 36 broken versions; every behaviour change caught after one gap (async path re-check) was closed and one hanging test was fixed. The remaining survivors are behaviour-equivalent (implementation plan, C-05 to C-07).
+- **Mutation checks:** path guard: 16 of 16 broken copies caught. Registry: 13 of 14 caught. Gateway: every behaviour change caught. Identity: 26 of 26 after two gaps were closed. Policy: every behaviour change caught after one gap (case-sensitive matching) was closed. Proxy: 36 broken versions; every behaviour change caught after one gap (async path re-check) was closed and one hanging test was fixed. Audit: 39 broken versions; every behaviour change caught after four gaps were closed. The remaining survivors are behaviour-equivalent (implementation plan, C-05 to C-07).
 - **GitHub Actions (remote evidence):** every job passed in both runs, Ruff (lint and format) plus pytest on `ubuntu-latest` and `macos-latest` × Python 3.11, 3.12, 3.13, with no skips:
   - run 42456322322 on `fb4be1b` (through C-04): 193 passed, 1 xfailed per job;
   - run 42456612529 on `95a11c5` (C-05): 245 passed, 1 xfailed per job;
   - run 42457691978 on `124fb2e` (C-06): 353 passed, 1 xfailed per job;
   - run 42461535297 on `25dad4f` (C-07): 450 passed, 1 xfailed per job;
   - run 42463102989 on `cc27883` (C-08): 546 passed, 1 xfailed per job;
-  - run 42465473430 on `708745d` (C-10): 635 passed, 1 xfailed per job.
+  - run 42465473430 on `708745d` (C-10): 635 passed, 1 xfailed per job;
+  - **the C-09 commit's run must be checked** (`gh run list --branch c01-project-scaffold`).
 
 ## 5. Decisions
 
@@ -75,16 +78,14 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 | D-16 / D-17 | C-11 / C-12 |
 | D-10, D-24e, D-24g, D-24h, D-02 verification | later increments or release |
 
-## 6. Next increment: blocked on owner decisions
+## 6. Next increment: C-11 pipeline (blocked on owner decisions)
 
-The next increments, per implementation plan §3:
-- **C-09 (audit store):** depends only on C-03. Blocked by the **SQLAlchemy part of NFR-002** (a new runtime dependency), **D-09** (v1 persistence model), **D-11** (audit storage default), **D-20** (concurrency), **D-24f** (audit wording) and the **D-24i** module name (`audit.py`). D-29 is approved.
-- **C-11 (pipeline):** needs C-06 to C-10 (C-09 is the only one missing), plus **D-16** (orchestrator and sole audit writer) and **D-20**. D-30 is approved (internal async entry). C-11 connects gateway → identity → detector stub → policy → proxy → audit and maps outcomes to `PipelineResult`.
-- C-12 (client) needs C-11, D-17 and the D-24i class name.
+C-11 depends on C-06 to C-10, all done. It is blocked by **D-16** (pipeline as sole orchestrator and sole audit writer) and the **rest of D-20** (asyncio-safe pipeline use, with blocking stages kept off the event loop). D-03 and D-30 are approved. C-11 connects gateway → identity → detector stub → policy → proxy, writes every C4.3 event through `AuditLogger` (each committed before the next stage), maps outcomes to `PipelineResult` (C1.6), and reports `audit_complete=False` for `:memory:` stores (C4.5).
+- C-12 (client) then needs C-11, D-17 (audit read API) and the D-24i class name `SentinelClient`.
 
-**Also for the owner:** confirm or amend the C-08 interpretations I-8 to I-11 and the C-10 interpretations I-12 to I-17 (decision record, under D-24).
+**Also for the owner:** confirm or amend interpretations I-8 to I-23 (decision record, under D-24).
 
-**Most useful owner action:** decide the C-09 set (SQLAlchemy dependency, D-09, D-11, D-20, D-24f, D-24i module name). That unblocks C-09, and with D-16 also C-11, the first end-to-end enforcement.
+**Most useful owner action:** decide D-16 and the remaining D-20 items, which opens C-11, the first end-to-end enforcement.
 
 ## 7. Security constraints not to forget
 
@@ -98,7 +99,7 @@ The next increments, per implementation plan §3:
 
 ## 8. Known limitations and gaps
 
-- **No end-to-end enforcement yet.** The components exist but no pipeline (C-11) connects them or writes the audit.
+- **No end-to-end enforcement yet.** The components exist, including the audit store, but no pipeline (C-11) connects them or writes the audit.
 - **Function level only so far:**
   - F7–F9 are now refused by the gateway; reporting them as `decision=None` is the pipeline (C-11);
   - F14 and F16 now also at the proxy, with spy counts (`test_proxy.py`);
@@ -109,8 +110,9 @@ The next increments, per implementation plan §3:
 - **Identity limits:** credentials are plain SHA-256 digests, which suits high-entropy tokens such as API keys, not passwords. The constant-time comparison is best effort (a dict lookup still precedes it). Grants are tool-level (D-24b), so a granted tool is trusted with everything its validated arguments allow (T-02). Rate-limited grants are refused until C-15. Agents are registered once, with no disable-later or rotation API.
 - **Policy limits:** rate limits (row 5) are not evaluated until C-15; `risk_score` is not computed (no approved formula); a `ToolSpec` with the right name but wrong metadata cannot be detected by policy, because the pipeline must pass the registry's spec (D-15). A decision is not enforcement until the proxy (C-10) executes only `decision.action` after re-verification.
 - **Proxy limits:** both guards are process-local (not shared across workers or hosts); single-use claims are kept for the proxy's lifetime, so memory grows with executed requests; a `tool_call_id` repeat more than 300 s after the first call finished is treated as new; path re-checks narrow but do not close the race before the tool's own `open`; the output filter is a pass-through until C-14; the proxy cannot re-derive the destructive-approval requirement (policy's, with the registry spec). Sync tools run on the calling thread; nothing is offloaded.
+- **Audit limits:** append-only through Sentinel's API only. Anyone with write access to the file, or privileged in-process code, can change or delete rows; there is no tamper evidence (hash-chaining is post-v1). Masking is heuristic and cannot recognise every secret (for example, a token with an unexpected shape). Durability depends on the filesystem honouring `fsync`. Writes are serialized per store; several processes on one file rely only on SQLite's locking and are not supported. No migrations: a schema mismatch refuses the store.
 - **Not yet in place:**
-  - remote CI verified through C-10 (see §4);
+  - remote CI verified through C-10; confirm the C-09 run (see §4);
   - no mypy, coverage or Hypothesis (D-22 remainder).
 - **Doc housekeeping still open:**
   - §15 of `testing_strategy.md` still shows PROD-TODO for the C-03 model parts of AT-36, AT-40, AT-41, AT-44 and AT-46. Trace each to a named test before marking it.
@@ -120,11 +122,11 @@ The next increments, per implementation plan §3:
 
 ```bash
 cd /path/to/Sentinel
-git status --short && git log --oneline -3    # expect the C-10 commit (or later)
+git status --short && git log --oneline -3    # expect the C-09 commit (or later)
 git fetch origin && git status -sb             # compare with the remote branch
 source .venv/bin/activate                      # recreate only with owner approval:
 # python3.11 -m venv .venv && python -m pip install -e ".[dev]" -c constraints-dev.txt
-pytest                                         # expect 635 passed, 1 xfailed at the C-10 commit
+pytest                                         # expect 817 passed, 1 xfailed at the C-09 commit
 ruff check . && ruff format --check .
 python -m pip check
 gh run list --repo Soham-Pasalkar/Sentinel --branch c01-project-scaffold   # CI result for the branch

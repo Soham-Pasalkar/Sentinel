@@ -15,6 +15,8 @@ from __future__ import annotations
 __all__ = [
     "ActionDenied",
     "ApprovalRequired",
+    "AuditIntegrityError",
+    "AuditUnavailableError",
     "ConfigurationError",
     "ExecutionRefused",
     "InternalEvaluationError",
@@ -85,6 +87,20 @@ class InternalEvaluationError(SentinelError):
         """Record the error code."""
         super().__init__(error_code)
         self.error_code = error_code
+
+
+class AuditUnavailableError(SentinelError):
+    """An audit event could not be committed or read (``AUDIT_UNAVAILABLE``).
+
+    Raised by the audit store and logger (C-09). The pipeline (C-11) maps it
+    to ``AUDIT_UNAVAILABLE``; a pre-execution failure means no invocation.
+    """
+
+    error_code = "AUDIT_UNAVAILABLE"
+
+
+class AuditIntegrityError(SentinelError, ValueError):
+    """Committed audit events for a request are inconsistent (C4.4, I-23)."""
 
 
 class ToolExecutionError(SentinelError):
