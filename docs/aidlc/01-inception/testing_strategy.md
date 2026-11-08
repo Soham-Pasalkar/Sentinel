@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | Phase | Inception |
-| Date | 2026-10-28 |
-| Status | Draft rev. 7 (operational refusals are not policy decisions; C-03 blocked on Pydantic, no new code); rev. 6 (Q-03c: internal errors distinct from denials; rev. 5 C-03a implemented; rev. 4 final contract gate; rev. 3 after C-02/C-02b) — pending owner review. **Production tests:** the 3 C-01 scaffold tests plus **52 C-03a tests** in `tests/unit/test_action.py` (AT-28–AT-31, model level; all passing locally on 2026-10-28). No other security test below is written. **Spike evidence:** C-02 (97 checks) and C-02b (120 checks) ran against *stand-ins*, not Sentinel code. §15 marks each adapter acceptance test as `SPIKE-RAN`, `NOT-RUN`, and `PROD-TODO`. Contracts C1–C4 and decisions D-xx: [`decision_record.md`](decision_record.md) |
+| Date | 2026-10-28; 2026-11-08 (rev. 8) |
+| Status | Draft rev. 8 (D-05, D-18, D-21 Approved: §4 empty-grant row and §5 matrix no longer pending; F9 aligned with C2.3); rev. 7 (operational refusals are not policy decisions; at the time C-03 was blocked on Pydantic, since resolved and implemented); rev. 6 (Q-03c: internal errors distinct from denials; rev. 5 C-03a implemented; rev. 4 final contract gate; rev. 3 after C-02/C-02b) — pending owner review. **Production tests:** the 3 C-01 scaffold tests plus **52 C-03a tests** in `tests/unit/test_action.py` (AT-28–AT-31, model level; all passing locally on 2026-10-28). No other security test below is written. **Spike evidence:** C-02 (97 checks) and C-02b (120 checks) ran against *stand-ins*, not Sentinel code. §15 marks each adapter acceptance test as `SPIKE-RAN`, `NOT-RUN`, and `PROD-TODO`. Contracts C1–C4 and decisions D-xx: [`decision_record.md`](decision_record.md) |
 
 ## 1. Principles
 
@@ -77,7 +77,7 @@ Each row is a parametrised case; expected values follow `architecture_assessment
 | destructive + path violation | DENY `RESTRICTED_PATH` |
 | two HIGH findings with different codes | deterministic tie-break (CF-03). **Rev. 5 (D-24c Approved):** reason = the code of the highest-severity finding at or above `deny_at_severity`; equal severities → lexicographically smallest `code` (Unicode code points); input order irrelevant; `finding_codes` sorted by descending severity, then ascending code |
 | CRITICAL with `deny_at_severity=CRITICAL`, plus HIGH | deny with the CRITICAL code |
-| grant with empty `allowed_path_prefixes` for a path tool | DENY `RESTRICTED_PATH` (C2.2, pending D-05) |
+| grant with empty `allowed_path_prefixes` for a path tool | DENY `RESTRICTED_PATH` (C2.2, D-05 Approved) |
 | grant with explicit `("/",)` | ALLOW for any absolute path (C2.2) |
 
 Policy tests construct canonical paths directly. Policy performs **no** path resolution (C2.4, SEC-019); resolution is tested in the gateway and path-guard suites.
@@ -99,7 +99,7 @@ Built in `tmp_path` with `ws/` as the allowed prefix and `outside/secret.txt`. O
 | F6 | `ws/inner → ws/a.txt` (symlink staying inside) | allowed; receives the resolved target |
 | F7 | relative path `a.txt` | refused, `decision=None`, `INVALID_REQUEST` (C2.3; rev. 7, was "denied") |
 | F8 | `""`, `"\x00"`, `"ws/a\x00.txt"` | refused, `decision=None`, `INVALID_REQUEST` (rev. 7, was "denied") |
-| F9 | `~/.ssh/id_rsa` | denied (relative / outside); never expanded |
+| F9 | `~/.ssh/id_rsa` | refused, `decision=None`, `INVALID_REQUEST` (C2.3: `~` is not absolute; rev. 8, was "denied"); never expanded |
 | F10 | non-existent file under `ws` (write tool) | allowed; resolved parent inside `ws` |
 | F11 | non-existent path whose parent is a symlink to outside | denied |
 | F12 | prefix itself is a symlink (`/tmp` → `/private/tmp` style) | correct containment after both sides are canonicalised |

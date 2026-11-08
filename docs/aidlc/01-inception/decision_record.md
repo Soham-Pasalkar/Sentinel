@@ -5,8 +5,8 @@
 | Phase | 1.5 — Decision lock and contract reconciliation |
 | Date | 2026-10-28 |
 | Decision owner | Soham Pasalkar |
-| Status | **Approval is recorded per entry.** Approved so far (owner, 2026-10-28; verbatim words in §12): D-01, D-02 (provisional), D-13, D-22 (partial), D-23 for C-01, after the C-02/C-02b review, **D-12 (expanded), D-25, D-26, D-27, D-28 and the C1.6 amendment of D-14**; and at the final contract gate (rev. 3), **D-07, D-29, D-30, D-31**, plus requirement **FR-022** and the **C-17 → C-16 consolidation** (conditional, satisfied in `implementation_plan.md`); and in rev. 4, the owner's answers to §14: **D-03, D-04, D-06, D-08, D-14 (complete), D-24c, D-24d Approved; D-15 and D-24i partly approved**; interpretations for D-07, D-29, D-30, D-31 confirmed; **C-03a authorized** (full C-03 remains unauthorized); and in rev. 5, **Q-03c Approved (Option B, without an `"error"` decision value)**; and in rev. 6, **operational refusals are not policy decisions** and the **C-03 increment is approved with `ToolGrant` out of scope**, but **implementation is blocked** by an unapproved runtime dependency (Pydantic; §8.6 rev. 6). Every other entry is *Proposed* (a recommendation ready for owner review) or *Pending* (needs information first). |
-| Revision | Rev. 2 (2026-10-28): C-02 / C-02b findings reconciled. New contracts C3.5–C3.7, decisions D-25–D-31, §13. **Rev. 3 (2026-10-28): final contract gate before C-03.** D-07, D-29, D-30, D-31 approved; D-03, D-04, D-06, D-08, D-14 (remainder), D-15, D-24c, D-24d reviewed (§14); C-03 entry gate (§8.6). Earlier text is kept; superseded positions are marked, not deleted. **Rev. 4 (2026-10-28): owner answers to §14 recorded (§12, §14.R4); C-03a authorized; new open question Q-03c.** **Rev. 5 (2026-10-28): Q-03c resolved: internal errors are represented separately from policy decisions (C1.6, C1.8).** **Rev. 6 (2026-10-28): owner decision on operational refusals (C1.6 table); C-03 approved (ToolGrant excluded); blocker found: Pydantic not an approved or installed dependency.** |
+| Status | **Approval is recorded per entry.** Approved so far (owner, 2026-10-28; verbatim words in §12): D-01, D-02 (provisional), D-13, D-22 (partial), D-23 for C-01, after the C-02/C-02b review, **D-12 (expanded), D-25, D-26, D-27, D-28 and the C1.6 amendment of D-14**; and at the final contract gate (rev. 3), **D-07, D-29, D-30, D-31**, plus requirement **FR-022** and the **C-17 → C-16 consolidation** (conditional, satisfied in `implementation_plan.md`); and in rev. 4, the owner's answers to §14: **D-03, D-04, D-06, D-08, D-14 (complete), D-24c, D-24d Approved; D-15 and D-24i partly approved**; interpretations for D-07, D-29, D-30, D-31 confirmed; **C-03a authorized** (full C-03 remains unauthorized); and in rev. 5, **Q-03c Approved (Option B, without an `"error"` decision value)**; and in rev. 6, **operational refusals are not policy decisions** and the **C-03 increment is approved with `ToolGrant` out of scope**, but **implementation is blocked** by an unapproved runtime dependency (Pydantic; §8.6 rev. 6); and in rev. 7, **NFR-002 (Pydantic part)** (C-03 then implemented and committed); and in rev. 8 (2026-11-08), **D-05, D-18 and D-21** (C-04 unblocked). Every other entry is *Proposed* (a recommendation ready for owner review) or *Pending* (needs information first). |
+| Revision | Rev. 2 (2026-10-28): C-02 / C-02b findings reconciled. New contracts C3.5–C3.7, decisions D-25–D-31, §13. **Rev. 3 (2026-10-28): final contract gate before C-03.** D-07, D-29, D-30, D-31 approved; D-03, D-04, D-06, D-08, D-14 (remainder), D-15, D-24c, D-24d reviewed (§14); C-03 entry gate (§8.6). Earlier text is kept; superseded positions are marked, not deleted. **Rev. 4 (2026-10-28): owner answers to §14 recorded (§12, §14.R4); C-03a authorized; new open question Q-03c.** **Rev. 5 (2026-10-28): Q-03c resolved: internal errors are represented separately from policy decisions (C1.6, C1.8).** **Rev. 6 (2026-10-28): owner decision on operational refusals (C1.6 table); C-03 approved (ToolGrant excluded); blocker found: Pydantic not an approved or installed dependency.** **Rev. 7 (2026-10-28): NFR-002 Pydantic part approved (§12); C-03 implemented.** **Rev. 8 (2026-11-08): D-05, D-18, D-21 approved (§7 entries, §12); C-04 unblocked; D-21 clarified: the Windows restriction applies to path-constrained tools only.** |
 | Supersedes | The active-register role of `open_decisions.md`. That file is kept unchanged as the Inception history, with a mapping to this record added at its top. |
 
 ## 0. How this record works
@@ -643,6 +643,12 @@ Each entry lists: **Q** question · **Options** · **Rec.** recommended option �
 - **Approval:** required. **Status:** Proposed. **Affects:** C2.1–C2.2, SEC-007, policy truth table. **Source:** INCEPTION CF-13.
 - **Rejected:** (a) fails open.
 
+- **Rev. 8 status: Approved** 2026-11-08 by the project owner (verbatim in §12): **option (b)**.
+  - **Decision:** a path-constrained tool whose grant has missing or empty `allowed_path_prefixes` is denied on every call: `decision="deny"`, reason `RESTRICTED_PATH`. Empty or missing never means unrestricted. Unrestricted access exists only as the explicit prefix `("/",)`. Registering empty prefixes emits a warning; registering `("/",)` is logged (C2.2).
+  - **Rationale:** as above. A missing constraint must not widen access.
+  - **Security:** fails closed. No implicit default grants broader filesystem access.
+  - **Affects requirements:** SEC-007, FR-010. **Increments:** C-04 (containment of an empty prefix set is always false; registration warning), C-07 (grants), C-08 (policy DENY `RESTRICTED_PATH`).
+
 ### D-06 — Destructive tools and approval
 - **Q:** How is "destructive" declared, and what happens to REQUIRE_APPROVAL?
 - **Options:** (a) `destructive: bool = False` (brief); (b) **required keyword with no default**; (c) default `True`. And for approval: (i) **never executes in v1**; (ii) an approve-and-replay API.
@@ -760,6 +766,11 @@ Each entry lists: **Q** question · **Options** · **Rec.** recommended option �
 - **Rec.:** adopt C2 as written.
 - **Options rejected:** resolve relative paths against the CWD (environment-dependent); exclude the prefix directory itself (breaks listing tools).
 - **Approval:** required. **Status:** Proposed. **Affects:** SEC-007, testing §5. **Source:** BRIEF R11; INCEPTION CF-13; PHASE-1.5.
+- **Rev. 8 status: Approved** 2026-11-08 by the project owner (verbatim in §12): **adopt C2 as written** (C2.1–C2.8), with no new semantics.
+  - **Decision:** absolute request paths only (relative paths and `~` → `INVALID_REQUEST`, never resolved against the working directory or expanded); canonicalisation in the gateway; prefixes canonicalised and validated at registration and required to exist as directories; component-wise containment, never string-prefix comparison; the prefix directory itself is contained; the canonical path is passed to the tool; the proxy re-resolves and re-validates immediately before invocation and refuses a path that changed or is no longer contained.
+  - **Rationale:** as above (environment-independent resolution; listing tools keep working).
+  - **Security:** closes pre-existing symlink, `..` and sibling-prefix escapes. **Limitations that must stay explicit** (C2 table): re-resolution does not remove the time-of-check/time-of-use window before the tool's own `open`; hard links are not detected; this is path-argument authorization, not an operating-system sandbox or filesystem isolation.
+  - **Affects requirements:** SEC-007, FR-004 (path part), FR-010 (prefix rules). **Increments:** C-04 (functions), C-06 (gateway use), C-07 (prefix registration for grants), C-08 (policy containment), C-10 (proxy re-resolution).
 
 ### D-19 — Output filter failure and M3 mode
 - **Q:** What happens when the filter fails, and what is the M3 default?
@@ -783,6 +794,11 @@ Each entry lists: **Q** question · **Options** · **Rec.** recommended option �
 - **Q:** Which platforms are supported?
 - **Rec.:** Linux and macOS. On Windows, registering a path-constrained tool raises `ConfigurationError`. CI on `ubuntu-latest` and `macos-latest`.
 - **Approval:** required. **Status:** Proposed. **Affects:** NFR-012, C2. **Source:** INCEPTION OD-10.
+- **Rev. 8 status: Approved** 2026-11-08 by the project owner (verbatim in §12), with a clarification.
+  - **Decision:** Linux and macOS are the supported platforms **for path-constrained filesystem enforcement**. Registering a path-constrained tool on Windows raises `ConfigurationError`. The restriction applies to path-constrained tools only: Sentinel as a whole is **not** declared unsupported on Windows (it is also not tested there). CI runs on `ubuntu-latest` and `macos-latest`.
+  - **Rationale:** C2 relies on POSIX path semantics (`realpath`, `PurePosixPath`); Windows paths (drive letters, UNC and `\\?\` forms, junctions) would need their own unverified rules.
+  - **Security:** the unsound case is refused at registration rather than enforced incorrectly.
+  - **Affects requirements:** NFR-012, SEC-007. **Increments:** C-04 (platform check, F20), C-05 (registry refuses path tools on Windows), CI workflow.
 
 ### D-22 — Development dependencies and build backend
 - **Q:** Which development-only dependencies and which build backend?
@@ -914,7 +930,7 @@ D-10 (scope; affects only later docs and limitations), D-12 (pending the experim
 | Must be approved before | Decisions |
 |---|---|
 | **C-03** (models and contracts) | D-03, D-04, D-06, D-07, D-08, D-14 (remainder; the C1.6 amendment is already Approved), D-15, D-24c, D-24d, **D-31** (model field) |
-| **C-04** (path guard) | D-05, D-18, D-21 |
+| **C-04** (path guard) | D-05, D-18, D-21 (**all Approved, rev. 8**) |
 | **C-09** (audit store) | D-09, D-11, D-24f, **D-29** (diagnostics content) |
 | **C-10** (proxy) | **D-31** (guard parameters). D-25, D-26 and D-27 are already Approved |
 | **C-11** (pipeline) | D-16, D-20, **D-30** (async entry) |
@@ -1026,7 +1042,7 @@ Acceptance: AT-28, AT-29, AT-30, AT-31 (model level). It would not create `Secur
 
 | Decision | Needed by |
 |---|---|
-| D-05, D-18, D-21 (path semantics, OS support) | C-04 |
+| ~~D-05, D-18, D-21 (path semantics, OS support)~~ **Approved in rev. 8** | C-04 |
 | D-24b (if `ToolGrant` moves to C-07) | C-07 |
 | D-24a (default deny; policy behaviour) | C-08 |
 | D-09, D-11, D-24f (persistence, storage default, wording) | C-09 |
@@ -1137,6 +1153,9 @@ D-29, D-30 and D-31 were created in this revision as **Proposed** details needed
 | 2026-10-28 | Operational refusals (C1.6, C1.7, C1.8; reclassifies §14.R5) | Approved | "The `decision` field represents an actual, applicable policy decision. It must not be used merely to indicate that execution was refused." • "Invalid request: `decision=None`, `INVALID_REQUEST`, execution not started." • "Unexpected internal evaluation error: `decision=None`, `INTERNAL_ERROR`, execution not started." • "Audit store unavailable before execution: preserve an actual policy decision if one was reached; otherwise use `None`. Do not execute unless the required pre-execution audit write succeeds." • "Action mismatch: `decision=None` for the refused attempt." • "Path changed after authorization: `decision=None` for the refused attempt." • "Decision already used: `decision=None` for the refused attempt." • "Duplicate tool-call ID: `decision=None` for the refused attempt." • "Guard capacity exhausted: `decision=None` for the refused attempt." • "For every refusal, preserve its specific error code and ensure the tool does not execute. Do not classify an operational refusal as a policy denial." • "If the closing audit write fails after execution, retain the actual policy decision, report execution status truthfully, mark the audit incomplete, and withhold the tool output." | Claude, from the owner's C-03 gate instruction |
 | 2026-10-28 | C-03 increment | Approved, with scope restriction; **implementation blocked** (§8.6 rev. 6) | "The project owner has approved the C-03 model and exception increment, subject to the scope restriction below." • "Implement the approved model and exception contracts, including the previously approved decisions and the Q-03c result semantics." • "**ToolGrant is out of scope until D-24b is resolved.** First inspect the design and determine whether it can be excluded cleanly. If C-03 cannot be implemented correctly without deciding D-24b, stop and report the exact blocker. Do not invent a ToolGrant contract." | same |
 | 2026-10-28 | NFR-002 (Pydantic part) | Approved; C-03 unblocked (rev. 7) | "I approve Pydantic v2 as a runtime dependency for Sentinel, using the compatibility range `pydantic>=2.14,<3`." • "I authorize installing the dependency into the existing project environment for C-03. Update `pyproject.toml` and `constraints-dev.txt` consistently, recording the exact resolved version in the constraints file." | Claude, from the owner's Pydantic instruction |
+| 2026-11-08 | D-05 | Approved, option (b) (rev. 8) | "Decision: Option B." • "A path-constrained tool with missing or empty `allowed_path_prefixes` must deny every path access request." • "Empty or missing prefixes must never mean unrestricted filesystem access." • "Explicit unrestricted access may only be represented by an explicit root prefix: `(\"/\",)`." • "The policy outcome for an attempted access without an allowed prefix must be `deny`, with reason `RESTRICTED_PATH`." | Claude, from the owner's C-04 instruction |
+| 2026-11-08 | D-18 | Approved (adopt C2 as written) | "Decision: Adopt the C2 filesystem contract as specified in the existing architecture documentation." • "Do not silently resolve relative paths against the current working directory." • "Re-resolution immediately before invocation does not eliminate all time-of-check/time-of-use race conditions." • "This mechanism is not an operating-system sandbox." • "Do not invent new semantics." | same |
+| 2026-11-08 | D-21 | Approved, clarified | "Decision: Linux and macOS are supported for path-constrained tools." • "Registering a path-constrained tool on Windows must raise `ConfigurationError`." • "Do not declare the entire Sentinel framework unsupported on Windows. The restriction applies specifically to path-constrained tools." • "Configure CI to test Linux and macOS using appropriate GitHub Actions runners (`ubuntu-latest` and `macos-latest`)." | same |
 
 With these rows, the rev. 3 "Interpretations … that the owner should confirm" items 1–5 are **confirmed**. D-30's internal/public definition was not addressed word for word; the owner's statement is consistent with it.
 

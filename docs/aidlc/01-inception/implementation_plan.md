@@ -1,10 +1,10 @@
-# Implementation Plan — Sentinel v1 Construction (rev. 7)
+# Implementation Plan — Sentinel v1 Construction (rev. 8)
 
 | | |
 |---|---|
-| Phase | Inception, revised in Phase 1.5 and after the C-02/C-02b review (rev. 3). Implemented so far: **C-01 only** (scaffold, commit `8a5a993`). C-02/C-02b were throwaway experiments |
-| Date | 2026-10-28 |
-| Status | Draft rev. 7 — pending owner review. C-03 approved by the owner but **blocked on the Pydantic dependency** (no C-03 code written). **C-03a authorized and implemented (uncommitted); full C-03 not authorized** (gate: `decision_record.md` §8.6, rev. 4 update). Contracts and decisions: [`decision_record.md`](decision_record.md) |
+| Phase | Inception, revised in Phase 1.5 and after the C-02/C-02b review (rev. 3). Implemented and committed: **C-01** (`8a5a993`), **C-03a and C-03** (`153df80`). C-02/C-02b were throwaway experiments (evidence committed in `2bd5ec4`) |
+| Date | 2026-10-28; 2026-11-08 (rev. 8) |
+| Status | Draft rev. 8 — pending owner review. **Rev. 8:** D-05, D-18, D-21 Approved; C-04 unblocked. *Rev. 7 status, kept as history:* C-03 approved by the owner but **blocked on the Pydantic dependency** (no C-03 code written). **C-03a authorized and implemented (uncommitted); full C-03 not authorized** (gate: `decision_record.md` §8.6, rev. 4 update). Contracts and decisions: [`decision_record.md`](decision_record.md) |
 
 ## 1. Shape of the plan
 
@@ -48,7 +48,7 @@
 
 **Security contracts that must be Approved before the increment that encodes them** (see "Blocked by" in each increment). Rev. 3 list, updated in rev. 4 (D-07, D-29, D-30, D-31 now Approved):
 - C-03 ← D-03, D-04, D-06, D-08, D-14 (remainder), D-15, D-24c, D-24d, **D-24i** (added in rev. 4; D-24b too if `ToolGrant` stays in C-03). Authoritative checklist: `decision_record.md` §8.6;
-- C-04 ← D-05, D-18, D-21;
+- C-04 ← D-05, D-18, D-21 (**all Approved, rev. 8**);
 - C-09 ← D-09, D-11, D-24f (D-29 Approved);
 - C-10 ← D-14, D-19, **D-31 default values** (TTL, capacity) (D-07, D-25, D-27, D-31 Approved);
 - C-11 ← D-16, D-20 (D-30 Approved: internal entry);
@@ -120,7 +120,7 @@
   - Result semantics now include the owner's operational-refusal table (decision record C1.6 rev. 6). Acceptance adds **AT-44 (model part), AT-46**.
   - **❌ Blocked:** the approved contract requires **Pydantic v2** (C1.3 `arg_schema` as a Pydantic model class; D-08 strict mode; `SecretStr`; brief §2 [DOC]). It is not installed and not declared, adding it is NFR-002 (Proposed), and this task prohibits installs.
   - **Unblocks with:** owner option A (approve `pydantic>=2.14,<3` as a runtime dependency, pin it, authorize installing it into the project `.venv`) or option B (a stdlib-only contract change). See decision record §8.6 rev. 6.
-- **Rev. 8 status: implemented locally, not committed (2026-10-28).**
+- **Rev. 8 status: implemented (2026-10-28); committed in `153df80`.**
   - Pydantic approved and installed (2.14.1).
   - Code: `src/sentinel/exceptions.py`, `src/sentinel/models.py`; C-03a `ActionEncodingError` re-parented.
   - Tests: `tests/unit/test_models.py`, `tests/unit/test_exceptions.py`.
@@ -160,13 +160,13 @@
   - error messages never contain the rejected values.
 - **Tests:** `tests/unit/test_action.py`, 52 tests covering AT-28, AT-29, AT-30 (model part), AT-31 (model part).
 - **Evidence (2026-10-28, project `.venv`, Python 3.11.14):** `pytest`: 55 passed (52 new + 3 scaffold); `ruff check .`: all checks passed; `ruff format --check .`: 5 files already formatted.
-- **Status: complete locally; not committed** (the owner asked for no commit).
+- **Status: complete; committed in `153df80`** (together with C-03).
 - **Not covered by C-03a:** the gateway mapping of `ActionEncodingError` to `INVALID_REQUEST` (C-06); reserved-key rejection (C-06); `SecurityDecision`, the proxy's digest re-check and replay protection (C-10); the guard (C-10).
 
 ### C-04 — Path guard (canonicalisation and pure containment)
 - **Objective:** C2 as two functions: `canonicalise(path) -> str` (I/O, used by the gateway and the proxy) and `is_contained(canonical, prefixes) -> bool` (pure, used by policy and the proxy).
 - **Scope:** one small module (`paths.py`, or inside `policy.py` if the owner prefers); prefix registration helper (exists, is a directory, `strict` realpath).
-- **Dependencies:** C-03. **Blocked by:** D-05, D-18, D-21.
+- **Dependencies:** C-03. **Blocked by:** D-05, D-18, D-21 — **all Approved (rev. 8)**; C-04 may start.
 - **Acceptance:** F1–F20 as specified (F15 strict xfail; F17 limitation test), on macOS locally and Linux in CI.
 - **Tests:** `unit/test_path_guard.py`; optional Hypothesis property test (accepted ⇒ contained by component).
 - **Security invariants:** SEC-007.
@@ -174,7 +174,7 @@
 
 ### C-05 — Tool registry
 - **Scope:** `registry.py`: register (unique; `arg_schema` and `destructive` required; `path_args` ⊆ schema `str` fields; refuses path tools on Windows), lookup of `(ToolSpec, callable)`, read-only spec listing. **Rev. 3:** a registration holds a sync callable, an async callable, or both, and the registry reports which entry points a tool supports.
-- **Dependencies:** C-03. **Blocked by:** D-06, D-08, D-21.
+- **Dependencies:** C-03. **Blocked by:** D-06, D-08, D-21 (all Approved; D-21 in rev. 8).
 - **Acceptance:** duplicate, missing-flag, missing-schema and bad-`path_args` registrations raise `RegistrationError`.
 - **Tests:** `unit/test_registry.py`. **Invariants:** SEC-014. **Evidence:** pytest output.
 
@@ -331,3 +331,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 5 | Owner answers recorded; C-03a authorized (scope narrowed to the owner's list: no reason-code constants) and implemented locally with evidence; C-03 gate updated (full C-03 unauthorized; Q-03c open) |
 | 6 | Q-03c resolved (internal errors → `decision=None`, `INTERNAL_ERROR`; not denials): C-03 scope and blockers, C-11 and C-16 acceptance updated. Full C-03 still requires the owner's explicit gate approval. C-03a unchanged |
 | 7 | Owner: operational refusals are not policy decisions; C-03 approved with `ToolGrant` excluded (four models moved to C-07); C-03 blocked on the Pydantic runtime dependency (options A/B in decision record §8.6); C-10 guard wording |
+| 8 | D-05, D-18, D-21 Approved (decision record rev. 8); C-04 and C-05 gates updated; stale C-01-only and "not committed" status lines corrected (C-03a and C-03 are in `153df80`) |

@@ -5,7 +5,7 @@
 | Phase | Inception |
 | Date | 2026-10-28 |
 | Inputs | Architecture PDF (13 pp.), `SENTINEL_BUILD_BRIEF.md`, the 11 diagrams in `docs/architecture/` |
-| Status | Draft rev. 7 (operational refusals are not policy decisions; C-03 approved but blocked on the Pydantic dependency). Rev. 6: Q-03c, internal errors are not denials. Rev. 5: owner answers recorded; C-03a implemented. Rev. 4: final contract gate (D-07, D-29, D-30, D-31 approved). Rev. 3 was after C-02/C-02b (owner approvals D-12, D-25–D-28 and the D-14 amendment). Rev. 3 amends §2 (adapter notes), §4 (claim, guard, interruption, async path), §5, §6 and §8; earlier text is kept and marked. Changes marked **[APPROVAL]** need owner sign-off. Rev. 2 replaces §4 and §8 with the reconciled contracts in [`decision_record.md`](decision_record.md); §1–3 and §5–7 are unchanged from rev. 1 except where noted. CF/OD references map to D-IDs through the table at the top of `open_decisions.md` |
+| Status | Draft rev. 8 (D-05, D-18, D-21 Approved: filesystem contract C2 and the Windows restriction for path-constrained tools). Rev. 7 (operational refusals are not policy decisions; C-03 was then blocked on the Pydantic dependency, since approved and implemented). Rev. 6: Q-03c, internal errors are not denials. Rev. 5: owner answers recorded; C-03a implemented. Rev. 4: final contract gate (D-07, D-29, D-30, D-31 approved). Rev. 3 was after C-02/C-02b (owner approvals D-12, D-25–D-28 and the D-14 amendment). Rev. 3 amends §2 (adapter notes), §4 (claim, guard, interruption, async path), §5, §6 and §8; earlier text is kept and marked. Changes marked **[APPROVAL]** need owner sign-off. Rev. 2 replaces §4 and §8 with the reconciled contracts in [`decision_record.md`](decision_record.md); §1–3 and §5–7 are unchanged from rev. 1 except where noted. CF/OD references map to D-IDs through the table at the top of `open_decisions.md` |
 
 ## 1. Summary verdict
 
@@ -205,7 +205,7 @@ Rev. 2. The Inception IDs are kept in brackets for traceability.
 | `PipelineResult` fields `execution` / `output_released` / `audit_complete` / `error_code` | D-14 (CF-05) |
 | Post-execution audit failure returned truthfully, not raised | D-03 (CF-09) |
 | Strict single validation; `arg_schema` required for all tools | D-08 (OD-09) |
-| Filesystem contract C2: gateway canonicalisation, pure containment, proxy re-resolution, empty ⇒ deny, existing prefixes | D-05, D-18 (CF-13) |
+| Filesystem contract C2: gateway canonicalisation, pure containment, proxy re-resolution, empty ⇒ deny, existing prefixes; path-constrained tools refused on Windows | D-05, D-18 (CF-13), D-21 — Approved (rev. 8) |
 | `destructive` required; approval never executes | D-06 (CF-04, CF-16) |
 | Identity from trusted application code; reserved keys | D-04 (CF-12) |
 | `wrap_tools()` instead of `protect(graph)`; async fails closed *(rev. 2; async part superseded in rev. 3, see below)* | D-12 (CF-18) |
