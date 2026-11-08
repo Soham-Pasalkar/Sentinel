@@ -1,6 +1,6 @@
 # Sentinel — Next-Session Resume Note
 
-Updated 2026-11-08 after C-05. This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
+Updated 2026-11-08 after C-05 (CI verified). This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
 
 ## 1. Purpose and architecture (brief)
 
@@ -21,11 +21,11 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 | Decisions | **D-05, D-18, D-21 approved**; specs aligned | `f64c8f6` |
 | C-04 | Path guard [`src/sentinel/paths.py`](../../src/sentinel/paths.py) (internal); 57 tests; CI adds `macos-latest` | `847c337` |
 | Housekeeping | CI also triggers on pushes to `c01-project-scaffold`; this note committed | `fb4be1b` |
-| C-05 | Tool registry [`src/sentinel/registry.py`](../../src/sentinel/registry.py) (internal); 52 tests | the C-05 commit after `fb4be1b` (see `git log`) |
+| C-05 | Tool registry [`src/sentinel/registry.py`](../../src/sentinel/registry.py) (internal); 52 tests | `95a11c5` |
 
 ## 3. Repository state (verified 2026-11-08)
 
-- **Branch:** `c01-project-scaffold`. HEAD is the C-05 commit, on top of `fb4be1b` (see `git log -3`).
+- **Branch:** `c01-project-scaffold`. HEAD `95a11c5` (C-05), local and remote in agreement.
 - **Remote:** `https://github.com/Soham-Pasalkar/Sentinel`, branch `c01-project-scaffold` (pushed with owner authorization; compare with `git fetch origin && git status -sb`).
   - The repository is **public**.
   - Because the repository was empty, GitHub made `c01-project-scaffold` the **default branch**.
@@ -41,7 +41,9 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 | `python -m pip check` | no broken requirements |
 
 - **Mutation checks:** path guard: 16 of 16 broken copies caught. Registry: 13 of 14 caught; the survivor is behaviour-equivalent (see the implementation plan, C-05).
-- **GitHub Actions (remote evidence):** run 42456322322 on `fb4be1b` (through C-04) passed every job: Ruff lint and format; pytest on `ubuntu-latest` and `macos-latest` × Python 3.11, 3.12, 3.13, each "193 passed, 1 xfailed", no skips. **The C-05 commit's run must be checked separately** (`gh run list --branch c01-project-scaffold`).
+- **GitHub Actions (remote evidence):** every job passed in both runs, Ruff (lint and format) plus pytest on `ubuntu-latest` and `macos-latest` × Python 3.11, 3.12, 3.13, with no skips:
+  - run 42456322322 on `fb4be1b` (through C-04): 193 passed, 1 xfailed per job;
+  - run 42456612529 on `95a11c5` (C-05): 245 passed, 1 xfailed per job.
 
 ## 5. Decisions
 
@@ -93,7 +95,7 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 - **Path guard limits** (documented, not defended): the window after `reverify` (F15, strict xfail); hard links (F17); paths a tool derives internally; case differences, which fail closed; mount boundaries. It is not a sandbox.
 - **Registry limits:** entry points are checked by kind only (sync vs coroutine function), not by signature against the schema, which is not a documented rule. A callable object with an `async __call__` is refused as an async entry point (fails closed). The registry is in-memory and per instance; "no mutation reachable from the tool-call path" (SEC-014) also depends on C-10 and C-11 passing it read-only use only.
 - **Not yet in place:**
-  - remote CI covers commits through C-04 (see §4); confirm the C-05 run;
+  - remote CI verified through C-05 (see §4);
   - no mypy, coverage or Hypothesis (D-22 remainder).
 - **Doc housekeeping still open:**
   - §15 of `testing_strategy.md` still shows PROD-TODO for the C-03 model parts of AT-36, AT-40, AT-41, AT-44 and AT-46. Trace each to a named test before marking it.
@@ -103,11 +105,11 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 
 ```bash
 cd /path/to/Sentinel
-git status --short && git log --oneline -3    # expect HEAD 847c337
+git status --short && git log --oneline -3    # expect HEAD 95a11c5 (or a later commit)
 git fetch origin && git status -sb             # compare with the remote branch
 source .venv/bin/activate                      # recreate only with owner approval:
 # python3.11 -m venv .venv && python -m pip install -e ".[dev]" -c constraints-dev.txt
-pytest                                         # expect 193 passed, 1 xfailed
+pytest                                         # expect 245 passed, 1 xfailed at 95a11c5
 ruff check . && ruff format --check .
 python -m pip check
 gh run list --repo Soham-Pasalkar/Sentinel --branch c01-project-scaffold   # CI result for the branch
