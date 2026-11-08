@@ -1,9 +1,9 @@
-# Requirements Specification — Sentinel v1 (AI-DLC Inception, rev. 9)
+# Requirements Specification — Sentinel v1 (AI-DLC Inception, rev. 10)
 
 | | |
 |---|---|
 | Phase | Inception, revised in Phase 1.5 (decision lock) and after the C-02/C-02b review (rev. 3) |
-| Date | 2026-10-28 (rev. 1–8); 2026-11-08 (rev. 9) |
+| Date | 2026-10-28 (rev. 1–8); 2026-11-08 (rev. 9–10) |
 | Owner | Soham Pasalkar |
 | Status | **Draft.** Requirements marked `Approved` derive directly from owner-approved decisions (`decision_record.md` §12); all others are `Proposed` or `Pending`. Contracts are defined in [`decision_record.md`](decision_record.md) (C1–C4); decisions are D-01 … D-31 |
 
@@ -38,7 +38,7 @@
 | FR-004 | Arguments are validated **once, in the gateway, before policy**, against the tool's required `arg_schema`, in strict mode with extra fields forbidden. Path arguments are then canonicalised (C2.3–C2.4). The result is the `AuthorizedAction` candidate that policy evaluates and the proxy executes, with **no second validation or coercion**. | MUST | DOC §4.5; P1.5 | D-08 Approved (rev. 5); path part Approved (D-18, rev. 9) | T | Schema violation → refused: `decision=None`, `INVALID_REQUEST` *(rev. 7; was DENY)*. `"1"` for an `int` field is rejected. Extra argument key → rejected. Mutating the caller's dict after submission does not change the executed arguments. | M1 |
 | FR-005 | Identity resolves the agent; unknown or disabled → `authorized=False`. | MUST | DOC §4.2 | Proposed | T | Each case → DENY `UNAUTHORIZED_AGENT`, not invoked. | M1 |
 | FR-006 | Credentials (rev. 5: configured **per agent**; `require_credentials` defaults to **`True`**; no mandatory signed tokens): if an agent has a stored credential hash, or `require_credentials=True`, the request must present a matching `auth_token`. Comparison uses `hmac.compare_digest` on SHA-256 digests; plaintext is never stored. | MUST | DOC §4.2; BRIEF §6.2 | Approved (D-04, rev. 5) | T, I | Correct → authorized; missing or wrong → `UNAUTHORIZED_AGENT`. With `require_credentials=True` **(the default)**, an agent without a credential → `UNAUTHORIZED_AGENT`; with an explicit `require_credentials=False`, identity-only agents are accepted. | M1 |
-| FR-007 | Identity loads the capability envelope; no envelope ⇒ no grants. | MUST | DOC §4.2 | Proposed | T | Any tool → DENY `UNAUTHORIZED_TOOL`. | M1 |
+| FR-007 | Identity loads the capability envelope; no envelope ⇒ no grants. **Rev. 10 (D-24b):** a grant covers the whole registered tool by name; it is not an ALLOW, and every call is still evaluated by policy. | MUST | DOC §4.2 | Grant granularity Approved (D-24b, rev. 10) | T | Any tool → DENY `UNAUTHORIZED_TOOL`. | M1 |
 | FR-008 | `PolicyEngine.evaluate(request, context, findings, tool_spec)` applies C1.5 rows 1–7 (row 5 from M4) and returns a `SecurityDecision` carrying `request_id`, `decision`, `reason`, `policy_version`, `finding_codes` and the evaluated `AuthorizedAction`. | MUST | DOC §4.4; BRIEF R4 | D-07, D-24c Approved (rev. 5); D-15 partly approved (delivery mechanism open, needed by C-08) | T | Truth table and precedence pairs (`testing_strategy.md` §4) pass; every decision has a reason and `policy_version`. | M1 |
 | FR-009 | `SecurityPolicy(version, deny_at_severity=HIGH, require_approval_for_destructive=True, require_credentials=True)` is constructed in code *(rev. 5: `require_credentials` default changed from `False` to `True`, D-04)*. JSON/YAML loading is SHOULD (later). | MUST / SHOULD | DOC §7; BRIEF §6.4 | Approved (D-04, D-06, D-24c; rev. 5) | T | Invalid policy → `ConfigurationError`, never a permissive policy. | M1 |
 | FR-010 | Registration: unique `name`; callable; **required** `arg_schema`; **required keyword** `destructive`; optional `path_args` (top-level `str` fields of the schema). Grants for path tools take `allowed_path_prefixes`, each absolute, existing and a directory, canonicalised at registration. | MUST | DOC §5; BRIEF R10; P1.5 | D-06, D-08 Approved (rev. 5); prefix rules Approved (D-05, D-18, rev. 9) | T | Duplicate → `RegistrationError`. Missing `destructive` or `arg_schema` → error. A `path_args` entry not in the schema → error. A non-existent prefix → `ConfigurationError`. | M1 |
@@ -155,3 +155,4 @@ Contract → requirement → test: `decision_record.md` §5 and `testing_strateg
 | 7 | 2026-10-28 | Owner decision: operational refusals are not policy decisions. **Revised:** FR-001, FR-003, FR-004, FR-012, FR-017, SEC-005, SEC-013, SEC-024, SEC-025; NFR-002 note (blocks C-03). **Added:** SEC-034. C-03 approved by the owner, but implementation blocked by the Pydantic runtime dependency |
 | 8 | 2026-10-28 | NFR-002 Pydantic part Approved; C-03 implemented (decision record §8.6 rev. 7) |
 | 9 | 2026-11-08 | D-05, D-18, D-21 Approved (decision record §12). **Approved:** SEC-007 (Windows wording narrowed to path-constrained tools; limitations stated), NFR-012 (rewritten), FR-004 path part, FR-010 prefix rules |
+| 10 | 2026-11-08 | D-24b Approved (decision record §12): FR-007 notes tool-level grants. SEC-001 stays Pending D-24a (default-deny policy behaviour) |

@@ -23,7 +23,7 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 | Housekeeping | CI also triggers on pushes to `c01-project-scaffold`; this note committed | `fb4be1b` |
 | C-05 | Tool registry [`src/sentinel/registry.py`](../../src/sentinel/registry.py) (internal); 52 tests | `95a11c5` |
 | Housekeeping | This note: C-05 CI recorded | `0794336` |
-| C-06 | Gateway [`src/sentinel/gateway.py`](../../src/sentinel/gateway.py) (internal); 108 tests | the C-06 commit after `0794336` (see `git log`) |
+| C-06 | Gateway [`src/sentinel/gateway.py`](../../src/sentinel/gateway.py) (internal); 108 tests | `124fb2e` |
 
 ## 3. Repository state (verified 2026-11-08)
 
@@ -46,7 +46,7 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 - **GitHub Actions (remote evidence):** every job passed in both runs, Ruff (lint and format) plus pytest on `ubuntu-latest` and `macos-latest` × Python 3.11, 3.12, 3.13, with no skips:
   - run 42456322322 on `fb4be1b` (through C-04): 193 passed, 1 xfailed per job;
   - run 42456612529 on `95a11c5` (C-05): 245 passed, 1 xfailed per job;
-  - **the C-06 commit's run must be checked** (`gh run list --branch c01-project-scaffold`).
+  - run 42457691978 on `124fb2e` (C-06): 353 passed, 1 xfailed per job.
 
 ## 5. Decisions
 
@@ -97,7 +97,7 @@ Every remaining increment needs at least one unapproved decision. Check the impl
 - **Registry limits:** entry points are checked by kind only (sync vs coroutine function), not by signature against the schema, which is not a documented rule. A callable object with an `async __call__` is refused as an async entry point (fails closed). The registry is in-memory and per instance; "no mutation reachable from the tool-call path" (SEC-014) also depends on C-10 and C-11 passing it read-only use only.
 - **Gateway limits:** schema validators see the original path, and the canonical path is not validated a second time (D-08: one validation). The action holds the caller's validated values, not a model dump, so a schema that transforms values cannot change what executes. Spec tension for C-16: FR-021 `session_id=None` vs the required `session_id` (FR-001, `SecurityRequest`).
 - **Not yet in place:**
-  - remote CI verified through C-05; confirm the C-06 run (see §4);
+  - remote CI verified through C-06 (see §4);
   - no mypy, coverage or Hypothesis (D-22 remainder).
 - **Doc housekeeping still open:**
   - §15 of `testing_strategy.md` still shows PROD-TODO for the C-03 model parts of AT-36, AT-40, AT-41, AT-44 and AT-46. Trace each to a named test before marking it.

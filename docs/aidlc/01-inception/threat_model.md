@@ -5,7 +5,7 @@
 | Phase | Inception (initial model; revisit at the end of M1, M2 and M5) |
 | Date | 2026-10-28 |
 | Method | Asset- and attacker-centred threat enumeration over the enforcement sequence in `architecture_assessment.md` §4, with STRIDE categories as a checklist |
-| Status | Draft rev. 6 — pending owner review. **Rev. 6** (Q-03c) updates the T-16 mitigation wording. *Rev. 5* added the T-03 credentials note (header not updated at the time). Rev. 4 updates T-17 and T-18 and adds T-21. Rev. 2 updated T-03, T-06, T-07, T-09, T-11, T-12. **Rev. 3** (after C-02/C-02b) updates T-12 and adds T-17–T-20, for the contracts in [`decision_record.md`](decision_record.md) C1.4, C1.6, C3.5, C3.6 |
+| Status | Draft rev. 7 — pending owner review. **Rev. 7** (2026-11-08, D-24b Approved) notes in T-02 that grants are tool-level. Rev. 6 — **Rev. 6** (Q-03c) updates the T-16 mitigation wording. *Rev. 5* added the T-03 credentials note (header not updated at the time). Rev. 4 updates T-17 and T-18 and adds T-21. Rev. 2 updated T-03, T-06, T-07, T-09, T-11, T-12. **Rev. 3** (after C-02/C-02b) updates T-12 and adds T-17–T-20, for the contracts in [`decision_record.md`](decision_record.md) C1.4, C1.6, C3.5, C3.6 |
 
 ## 1. System under analysis
 
@@ -58,6 +58,7 @@ An in-process Python library sitting between agent frameworks and registered too
 - **Requirements:** FR-004, FR-010, SEC-007.
 - **Tests:** schema rejection tests; path constraint tests.
 - **Residual:** **high for tools with free-form arguments** (SQL, shell, URLs). v1 has no argument-content policy beyond schemas and paths. Tool authors own the semantics of each argument. Document that "a granted tool is trusted with everything its arguments allow".
+- **Rev. 7 (D-24b Approved):** grants are tool-level by design: no sub-action or argument-level grants in v1. A grant is not an ALLOW: each call is still validated (C-06) and evaluated by policy, and the action is bound by its digest. The multiplexed-tool scenario above is therefore mitigated only by splitting operations into separate tools, which is unchanged.
 
 ### T-03 — Agent identity spoofing
 - **Asset / property:** A4 / authenticity → A3.

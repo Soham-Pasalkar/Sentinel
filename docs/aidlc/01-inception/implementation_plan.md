@@ -206,15 +206,15 @@
   - Evidence: local macOS, Python 3.11.14: 353 passed, 1 xfailed; Ruff and format clean; `pip check` clean. Remote CI: see the C-06 commit's run.
 
 ### C-07 — Identity and capability lookup
-- **Rev. 7:** also defines the models moved out of C-03: `ToolGrant` (shape per D-24b, which must be Approved first), `RateLimit`, `CapabilityEnvelope`, `SecurityContext`. **Blocked by D-24b** in addition to D-04 and D-05.
+- **Rev. 7:** also defines the models moved out of C-03: `ToolGrant` (shape per D-24b, which must be Approved first), `RateLimit`, `CapabilityEnvelope`, `SecurityContext`. **Blocked by D-24b** in addition to D-04 and D-05. **Rev. 12: D-24b Approved (tool-level grants); D-04 and D-05 Approved. C-07 may start.** The gaps the contracts leave open are recorded as interpretations I-1 to I-7 under D-24 in the decision record.
 - **Scope:** `identity.py`: in-memory agent and envelope repositories; `register_agent` support (hash only); `require_credentials`.
-- **Dependencies:** C-03; C-04 (prefix registration helper for grants). **Blocked by:** D-04, D-05.
+- **Dependencies:** C-03; C-04 (prefix registration helper for grants); C-05 (the registry, used to check grants name registered tools and whether a tool takes paths; interpretation I-1, I-2). **Blocked by:** D-04, D-05 (both Approved), D-24b (Approved, rev. 12).
 - **Acceptance:** FR-005–007; grant with a non-existent prefix → `ConfigurationError`; empty prefixes allowed at registration with a warning.
 - **Tests:** `unit/test_identity.py`. **Invariants:** identity never decides. **Evidence:** pytest output.
 
 ### C-08 — Policy engine
 - **Scope:** `policy.py`: `SecurityPolicy`; `PolicyEngine.evaluate(request, context, findings, tool_spec)` rows 1–4, 6, 7; pure; embeds the action in the decision.
-- **Dependencies:** C-03, C-04 (`is_contained`), C-07. **Blocked by:** D-05, D-06, D-15, D-24a/b/c.
+- **Dependencies:** C-03, C-04 (`is_contained`), C-07. **Blocked by:** D-05, D-06, D-15, D-24a/b/c. *(Rev. 12: D-05, D-06, D-24b, D-24c Approved; still open: D-15 remainder, D-24a.)*
 - **Acceptance:** truth table P1–P8 and precedence pairs; determinism (1,000 iterations); evaluation succeeds with file and socket access patched to raise.
 - **Tests:** `unit/test_policy.py`. **Invariants:** SEC-001, SEC-012, SEC-019. **Evidence:** pytest output.
 
@@ -355,3 +355,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 9 | C-04 implemented: `paths.py`, 57 tests; CI matrix adds `macos-latest`; Linux evidence outstanding |
 | 10 | C-04 remote CI evidence (run on `fb4be1b`: Ruff and pytest on Linux and macOS × Python 3.11–3.13 all passed); C-05 implemented: `registry.py`, 52 tests |
 | 11 | C-06 implemented: `gateway.py`, 108 tests |
+| 12 | D-24b Approved; C-07 gate and dependencies updated (C-05 added as a dependency for grant checks); C-08 open blockers narrowed to D-15 remainder and D-24a |
