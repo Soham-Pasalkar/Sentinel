@@ -220,7 +220,7 @@
 
 ### C-08 — Policy engine
 - **Scope:** `policy.py`: `SecurityPolicy`; `PolicyEngine.evaluate(request, context, findings, tool_spec)` rows 1–4, 6, 7; pure; embeds the action in the decision.
-- **Dependencies:** C-03, C-04 (`is_contained`), C-07. **Blocked by:** D-05, D-06, D-15, D-24a/b/c. *(Rev. 12: D-05, D-06, D-24b, D-24c Approved; still open: D-15 remainder, D-24a.)*
+- **Dependencies:** C-03, C-04 (`is_contained`), C-07. **Blocked by:** D-05, D-06, D-15, D-24a/b/c. *(Rev. 12: D-05, D-06, D-24b, D-24c Approved; still open: D-15 remainder, D-24a.)* **Rev. 14: D-15 (complete) and D-24a Approved; C-08 may start.** Gaps filled by interpretations I-8 to I-11 (decision record, D-24): reason codes `DESTRUCTIVE_TOOL` and `ALLOWED`, the action as a keyword-only input, inconsistent inputs raised (not decided), `risk_score` not computed.
 - **Acceptance:** truth table P1–P8 and precedence pairs; determinism (1,000 iterations); evaluation succeeds with file and socket access patched to raise.
 - **Tests:** `unit/test_policy.py`. **Invariants:** SEC-001, SEC-012, SEC-019. **Evidence:** pytest output.
 
@@ -363,3 +363,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 11 | C-06 implemented: `gateway.py`, 108 tests |
 | 12 | D-24b Approved; C-07 gate and dependencies updated (C-05 added as a dependency for grant checks); C-08 open blockers narrowed to D-15 remainder and D-24a |
 | 13 | C-07 implemented: four models in `models.py`, `identity.py`, 97 tests |
+| 14 | D-24a and D-15 Approved, I-1 to I-7 confirmed; C-08 unblocked |

@@ -25,7 +25,7 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 | Housekeeping | This note: C-05 CI recorded | `0794336` |
 | C-06 | Gateway [`src/sentinel/gateway.py`](../../src/sentinel/gateway.py) (internal); 108 tests | `124fb2e` |
 | Decisions | **D-24b approved** (tool-level grants); C-07 interpretations I-1–I-7 | `7efb7f2` |
-| C-07 | Identity and grants [`src/sentinel/identity.py`](../../src/sentinel/identity.py), four models in `models.py`; 97 tests | the C-07 commit after `7efb7f2` (see `git log`) |
+| C-07 | Identity and grants [`src/sentinel/identity.py`](../../src/sentinel/identity.py), four models in `models.py`; 97 tests | `25dad4f` |
 
 ## 3. Repository state (verified 2026-11-08)
 
@@ -49,7 +49,7 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
   - run 42456322322 on `fb4be1b` (through C-04): 193 passed, 1 xfailed per job;
   - run 42456612529 on `95a11c5` (C-05): 245 passed, 1 xfailed per job;
   - run 42457691978 on `124fb2e` (C-06): 353 passed, 1 xfailed per job;
-  - **the C-07 commit's run must be checked** (`gh run list --branch c01-project-scaffold`).
+  - run 42461535297 on `25dad4f` (C-07): 450 passed, 1 xfailed per job.
 
 ## 5. Decisions
 
@@ -76,7 +76,7 @@ Every remaining increment needs at least one unapproved decision (implementation
 - **C-09 (audit store):** independent. Needs the SQLAlchemy part of NFR-002 (a new runtime dependency), D-09, D-11, D-20, D-24f, and the D-24i module name.
 - **C-10 (proxy):** needs C-08, plus D-19 (failure rule) and the D-31 default TTL and capacity.
 
-**Also for the owner:** confirm or amend the C-07 interpretations I-1 to I-7 (decision record, under D-24).
+**C-07 interpretations I-1 to I-7:** confirmed by the owner (rev. 10).
 
 **Most useful owner action:** decide D-24a and the D-15 remainder, which opens C-08.
 
@@ -102,7 +102,7 @@ Every remaining increment needs at least one unapproved decision (implementation
 - **Gateway limits:** schema validators see the original path, and the canonical path is not validated a second time (D-08: one validation). The action holds the caller's validated values, not a model dump, so a schema that transforms values cannot change what executes. Spec tension for C-16: FR-021 `session_id=None` vs the required `session_id` (FR-001, `SecurityRequest`).
 - **Identity limits:** credentials are plain SHA-256 digests, which suits high-entropy tokens such as API keys, not passwords. The constant-time comparison is best effort (a dict lookup still precedes it). Grants are tool-level (D-24b), so a granted tool is trusted with everything its validated arguments allow (T-02). Rate-limited grants are refused until C-15. Agents are registered once, with no disable-later or rotation API.
 - **Not yet in place:**
-  - remote CI verified through C-06; confirm the C-07 run (see §4);
+  - remote CI verified through C-07 (see §4);
   - no mypy, coverage or Hypothesis (D-22 remainder).
 - **Doc housekeeping still open:**
   - §15 of `testing_strategy.md` still shows PROD-TODO for the C-03 model parts of AT-36, AT-40, AT-41, AT-44 and AT-46. Trace each to a named test before marking it.

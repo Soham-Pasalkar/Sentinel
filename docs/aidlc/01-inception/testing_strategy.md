@@ -4,7 +4,7 @@
 |---|---|
 | Phase | Inception |
 | Date | 2026-10-28; 2026-11-08 (rev. 8) |
-| Status | Draft rev. 9 (D-24b Approved: grants are tool-level; the E2E fixture now sets `require_credentials=False` explicitly, since D-04 made `True` the default). Rev. 8 (D-05, D-18, D-21 Approved: §4 empty-grant row and §5 matrix no longer pending; F9 aligned with C2.3); rev. 7 (operational refusals are not policy decisions; at the time C-03 was blocked on Pydantic, since resolved and implemented); rev. 6 (Q-03c: internal errors distinct from denials; rev. 5 C-03a implemented; rev. 4 final contract gate; rev. 3 after C-02/C-02b) — pending owner review. **Production tests (2026-11-08):** 3 C-01 scaffold tests; **52 C-03a tests** (`tests/unit/test_action.py`; AT-28–AT-31, model level); **82 C-03 tests** (`test_models.py`, `test_exceptions.py`); **57 C-04 tests** (`test_path_guard.py`; §5 F1–F20 at function level, F15 strict xfail); **52 C-05 tests** (`test_registry.py`; FR-010, SEC-014); **108 C-06 tests** (`test_gateway.py`; FR-001, FR-003, FR-004, SEC-013, gateway parts of AT-31 and AT-36, F7–F9 at gateway level); **97 C-07 tests** (`test_identity.py`; FR-005, FR-006, FR-007 identity parts, D-24b grant model, C2.1/C2.2 prefixes on grants). Full suite: 450 passed, 1 xfailed locally (macOS). Remote CI (Linux and macOS × Python 3.11–3.13) passed on `fb4be1b` with 193 passed, 1 xfailed, i.e. through C-04. No other security test below is written. **Spike evidence:** C-02 (97 checks) and C-02b (120 checks) ran against *stand-ins*, not Sentinel code. §15 marks each adapter acceptance test as `SPIKE-RAN`, `NOT-RUN`, and `PROD-TODO`. Contracts C1–C4 and decisions D-xx: [`decision_record.md`](decision_record.md) |
+| Status | Draft rev. 10 (D-24a and D-15 Approved: §4 rows P6/P7 use the I-8 reason codes `DESTRUCTIVE_TOOL` and `ALLOWED`; P5's "risk_score recorded" waits for an approved formula, I-11). Rev. 9 (D-24b Approved: grants are tool-level; the E2E fixture now sets `require_credentials=False` explicitly, since D-04 made `True` the default). Rev. 8 (D-05, D-18, D-21 Approved: §4 empty-grant row and §5 matrix no longer pending; F9 aligned with C2.3); rev. 7 (operational refusals are not policy decisions; at the time C-03 was blocked on Pydantic, since resolved and implemented); rev. 6 (Q-03c: internal errors distinct from denials; rev. 5 C-03a implemented; rev. 4 final contract gate; rev. 3 after C-02/C-02b) — pending owner review. **Production tests (2026-11-08):** 3 C-01 scaffold tests; **52 C-03a tests** (`tests/unit/test_action.py`; AT-28–AT-31, model level); **82 C-03 tests** (`test_models.py`, `test_exceptions.py`); **57 C-04 tests** (`test_path_guard.py`; §5 F1–F20 at function level, F15 strict xfail); **52 C-05 tests** (`test_registry.py`; FR-010, SEC-014); **108 C-06 tests** (`test_gateway.py`; FR-001, FR-003, FR-004, SEC-013, gateway parts of AT-31 and AT-36, F7–F9 at gateway level); **97 C-07 tests** (`test_identity.py`; FR-005, FR-006, FR-007 identity parts, D-24b grant model, C2.1/C2.2 prefixes on grants). Full suite: 450 passed, 1 xfailed locally (macOS). Remote CI (Linux and macOS × Python 3.11–3.13) passed on `fb4be1b` with 193 passed, 1 xfailed, i.e. through C-04. No other security test below is written. **Spike evidence:** C-02 (97 checks) and C-02b (120 checks) ran against *stand-ins*, not Sentinel code. §15 marks each adapter acceptance test as `SPIKE-RAN`, `NOT-RUN`, and `PROD-TODO`. Contracts C1–C4 and decisions D-xx: [`decision_record.md`](decision_record.md) |
 
 ## 1. Principles
 
@@ -61,10 +61,10 @@ Each row is a parametrised case; expected values follow `architecture_assessment
 | P2 | T | F | – | – | – | – | DENY `UNAUTHORIZED_TOOL` |
 | P3 | T | T | F | – | – | – | DENY `RESTRICTED_PATH` |
 | P4 | T | T | T | HIGH (`PROMPT_INJECTION`) | F | – | DENY `PROMPT_INJECTION` |
-| P5 | T | T | T | MEDIUM | F | – | ALLOW (risk_score recorded) |
-| P6 | T | T | T | none | T | T | REQUIRE_APPROVAL |
-| P7 | T | T | T | none | T | F | ALLOW |
-| P8 | T | T | T | none | F | – | ALLOW |
+| P5 | T | T | T | MEDIUM | F | – | ALLOW (risk_score recorded; rev. 10: `risk_score` stays `None` until a formula is approved, I-11) |
+| P6 | T | T | T | none | T | T | REQUIRE_APPROVAL (`DESTRUCTIVE_TOOL`, I-8) |
+| P7 | T | T | T | none | T | F | ALLOW (`ALLOWED`, I-8) |
+| P8 | T | T | T | none | F | – | ALLOW (`ALLOWED`, I-8) |
 
 **Precedence pairs** (each must return the earlier row's result):
 
@@ -182,7 +182,7 @@ This is the first E2E suite. It must pass before any detection, output-filter, r
 - Workspace `tmp_path/ws/` containing `data.txt` (`"hello"`), and `tmp_path/outside/secret.txt`.
 - Tools, each with a strict `arg_schema` (D-08): `read_file(path)` (path_args=`("path",)`, `destructive=False`); `delete_file(path)` (path_args=`("path",)`, `destructive=True`); `send_email(to, body)` (`destructive=False`, registered, not granted). Each tool is wrapped in a spy.
 - Agent `research_agent` (enabled, no credential, so the fixture constructs identity with `require_credentials=False` explicitly: the default is `True`, D-04; rev. 9 correction), grants: `read_file` and `delete_file`, each with `allowed_path_prefixes=(<tmp_path>/ws,)`.
-- `SecurityPolicy(version="test-1")`; detector = stub.
+- `SecurityPolicy(version="test-1")`; detector = stub (no Tool-Abuse detector, D-15).
 
 Audit abbreviations: RR = REQUEST_RECEIVED, IR = IDENTITY_RESOLVED, DEC = DECISION, ES = EXECUTION_STARTED, RC = REQUEST_COMPLETED (C4.3). Paths are absolute under `tmp_path`.
 
@@ -256,7 +256,7 @@ Every security contract in `decision_record.md` has at least one acceptance test
 | C1.2 trusted identity, reserved keys, credentials, tool-level grants | D-04, D-24b | identity suite (`unit/test_identity.py`, rev. 9: implemented in C-07: unknown, disabled, missing and wrong credential → `authorized=False`; `require_credentials` default `True`; digest-only storage; `compare_digest`; exact-name grants; prefixes through C-04); E2E-04, E2E-08 (pending C-11/C-12); adapter identity-injection test (M5) |
 | C1.3 tool metadata | D-06, D-08, D-15 | registry suite; policy truth table P1–P8 |
 | C1.4 action binding | D-07 | NI-08, NI-09, NI-13; fault rows "digest mismatch", "registry lookup" |
-| C1.5 policy outcomes | D-06, D-24a/c | truth table and precedence pairs; NI-01, NI-02, NI-10; E2E-02–05 |
+| C1.5 policy outcomes | D-06, D-24a/c, D-15 | truth table and precedence pairs (`unit/test_policy.py`); NI-01, NI-02, NI-10; E2E-02–05 |
 | C1.6 execution outcomes | D-14 | NI-07, NI-14; all §6 rows |
 | C1.7 audit pre/post | D-03, D-09 | NI-04, NI-06; §6 audit rows; E2E-07, E2E-09 |
 | C1.8 errors | D-03, D-24d | §6 matrix (no row raises); NI-11 canary |

@@ -5,7 +5,7 @@
 | Phase | Inception (initial model; revisit at the end of M1, M2 and M5) |
 | Date | 2026-10-28 |
 | Method | Asset- and attacker-centred threat enumeration over the enforcement sequence in `architecture_assessment.md` §4, with STRIDE categories as a checklist |
-| Status | Draft rev. 7 — pending owner review. **Rev. 7** (2026-11-08, D-24b Approved) notes in T-02 that grants are tool-level. Rev. 6 — **Rev. 6** (Q-03c) updates the T-16 mitigation wording. *Rev. 5* added the T-03 credentials note (header not updated at the time). Rev. 4 updates T-17 and T-18 and adds T-21. Rev. 2 updated T-03, T-06, T-07, T-09, T-11, T-12. **Rev. 3** (after C-02/C-02b) updates T-12 and adds T-17–T-20, for the contracts in [`decision_record.md`](decision_record.md) C1.4, C1.6, C3.5, C3.6 |
+| Status | Draft rev. 8 — pending owner review. **Rev. 8** (2026-11-08, D-24a and D-15 Approved) notes in T-04 that no detector result is ever an authorization. **Rev. 7** (2026-11-08, D-24b Approved) notes in T-02 that grants are tool-level. Rev. 6 — **Rev. 6** (Q-03c) updates the T-16 mitigation wording. *Rev. 5* added the T-03 credentials note (header not updated at the time). Rev. 4 updates T-17 and T-18 and adds T-21. Rev. 2 updated T-03, T-06, T-07, T-09, T-11, T-12. **Rev. 3** (after C-02/C-02b) updates T-12 and adds T-17–T-20, for the contracts in [`decision_record.md`](decision_record.md) C1.4, C1.6, C3.5, C3.6 |
 
 ## 1. System under analysis
 
@@ -78,6 +78,7 @@ An in-process Python library sitting between agent frameworks and registered too
 - **Mitigations:** **deterministic (primary):** the capability envelope and path constraints limit what an injected agent can do. A research agent without an email tool, or without read access outside `/workspace`, cannot complete the attack. **Heuristic (secondary, M2):** keyword/pattern detection on argument strings; a finding ≥ threshold ⇒ DENY.
 - **Requirements:** SEC-001, SEC-007, FR-014, SEC-012, SEC-020.
 - **Tests:** M2 table-driven detector tests including a benign false-positive corpus; E2E "injection phrase in argument ⇒ DENY"; a test showing that an evasive paraphrase is **not** detected (documents the limit).
+- **Rev. 8 (D-24a, D-15 Approved):** detection is advisory input to policy only. There is no Tool-Abuse detector, and an empty findings list is never an authorization: identity, grant (default deny), path and destructive rows still apply.
 - **Residual:** **high.** Sentinel does not see the model's context. Injection text in tool *outputs* is not scanned in v1. Paraphrase, encoding or translation defeats keyword rules. An injected agent can still misuse every capability it legitimately holds.
 
 ### T-05 — Sensitive-data exposure
