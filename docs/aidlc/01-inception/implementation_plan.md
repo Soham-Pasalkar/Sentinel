@@ -197,6 +197,13 @@
 - **Dependencies:** C-03, C-04, C-05. **Blocked by:** D-04 (reserved keys), D-08, D-18. **Rev. 4 acceptance additions:** AT-31 (gateway part: non-JSON-native values → `INVALID_REQUEST`), AT-36 (gateway part).
 - **Acceptance:** FR-001, FR-003, FR-004; relative, `~`, NUL and empty paths → `INVALID_REQUEST`; the canonical path appears in the action; the canary from an invalid field is absent from the error.
 - **Tests:** `unit/test_gateway.py`. **Invariants:** SEC-008 (validation errors), SEC-013 (reserved keys). **Evidence:** pytest output.
+- **Rev. 11 status: implemented (2026-11-08).**
+  - Code: `src/sentinel/gateway.py` (internal, not exported): `validate_request(raw, *, registry, request_id, received_at) -> ValidatedRequest(request, action, spec)`. `request_id` and `received_at` are supplied by the caller (the pipeline assigns them before validation, C1.1); every refusal raises `InvalidRequestError`, which the pipeline (C-11) reports as `decision=None`, `INVALID_REQUEST`. The gateway builds no `PipelineResult`, because `audit_complete` is the pipeline's.
+  - Rules: `raw` must be a mapping with exactly the FR-001 keys plus optional `auth_token` and `tool_call_id` (unknown keys refused, as by the `SecurityRequest` model); `arguments` must be a `dict`; `auth_token` must be a `str` (the model's lenient `auth_token` would also decode `bytes`); the tool must be registered; arguments validated once with `model_validate(..., strict=True)`; every `path_args` field must be **present** (a tool-side default path would escape every path check) and is replaced by `paths.canonicalise(...)`; the `AuthorizedAction` is built over the caller's validated values (no model dump, so schema defaults are not added and nothing is converted); the `SecurityRequest` (types, non-empty strings, UTC, reserved keys) is built from the same canonical arguments. Pydantic errors are replaced by fixed text and not chained.
+  - Not in C-06: containment of canonical paths (C-08), grants and identity (C-07), the guard part of AT-36 (C-10), result and audit mapping (C-11).
+  - Spec note for C-16: FR-021 gives `wrap_tools` a `session_id=None` default, while FR-001 and the C-03 `SecurityRequest` require `session_id`; C-06 follows FR-001. The adapter must supply a session id or the contracts must be reconciled at C-16.
+  - Tests: `tests/unit/test_gateway.py`, 108 tests. Also run against 15 deliberately broken gateways plus one with the model's reserved-key check removed: every behaviour change fails a test; two survivors are behaviour-equivalent (taking the tool name from `raw` instead of the spec, since lookup is exact; and an early shape check that duplicated the final model build, which was then removed).
+  - Evidence: local macOS, Python 3.11.14: 353 passed, 1 xfailed; Ruff and format clean; `pip check` clean. Remote CI: see the C-06 commit's run.
 
 ### C-07 — Identity and capability lookup
 - **Rev. 7:** also defines the models moved out of C-03: `ToolGrant` (shape per D-24b, which must be Approved first), `RateLimit`, `CapabilityEnvelope`, `SecurityContext`. **Blocked by D-24b** in addition to D-04 and D-05.
@@ -347,3 +354,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 8 | D-05, D-18, D-21 Approved (decision record rev. 8); C-04 and C-05 gates updated; stale C-01-only and "not committed" status lines corrected (C-03a and C-03 are in `153df80`) |
 | 9 | C-04 implemented: `paths.py`, 57 tests; CI matrix adds `macos-latest`; Linux evidence outstanding |
 | 10 | C-04 remote CI evidence (run on `fb4be1b`: Ruff and pytest on Linux and macOS × Python 3.11–3.13 all passed); C-05 implemented: `registry.py`, 52 tests |
+| 11 | C-06 implemented: `gateway.py`, 108 tests |
