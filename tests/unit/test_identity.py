@@ -708,5 +708,5 @@ def test_identity_does_no_containment_or_policy():
 
 
 def test_identity_is_internal():
-    assert sentinel.__all__ == ["__version__"]
+    assert "IdentityStore" not in sentinel.__all__
     assert not hasattr(sentinel, "IdentityStore")

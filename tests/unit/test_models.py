@@ -455,5 +455,19 @@ def test_result_serializes_lowercase_and_hides_output_in_repr():
 
 
 def test_models_are_not_exported_publicly():
-    assert sentinel.__all__ == ["__version__"]
-    assert not hasattr(sentinel, "PipelineResult")
+    # C-12 deliberately exports the result and enum types the public client
+    # signatures use (FR-016, FR-017; I-33); the other models stay internal.
+    internal = {
+        "SecurityRequest",
+        "ToolSpec",
+        "SecurityDecision",
+        "SecurityFinding",
+        "CapabilityEnvelope",
+        "SecurityContext",
+        "RateLimit",
+    }
+    assert not internal & set(sentinel.__all__)
+    assert not any(hasattr(sentinel, name) for name in internal)
+    assert {"PipelineResult", "Decision", "Execution", "Severity", "ToolGrant"} <= set(
+        sentinel.__all__
+    )

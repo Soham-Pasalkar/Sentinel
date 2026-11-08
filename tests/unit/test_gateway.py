@@ -668,5 +668,5 @@ def test_no_error_or_log_contains_request_values(registry, ws, caplog):
 
 
 def test_gateway_is_internal():
-    assert sentinel.__all__ == ["__version__"]
+    assert not {"validate_request", "ValidatedRequest"} & set(sentinel.__all__)
     assert not hasattr(sentinel, "validate_request")

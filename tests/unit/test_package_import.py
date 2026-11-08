@@ -13,4 +13,24 @@ def test_installed_metadata_matches_package_version():
 
 
 def test_public_api_is_intentionally_minimal():
-    assert sentinel.__all__ == ["__version__"]
+    # C-12 (I-33): the client, the types its signatures need, and the
+    # exceptions it raises. Nothing else.
+    assert sorted(sentinel.__all__) == [
+        "AuditEvent",
+        "AuditUnavailableError",
+        "ConfigurationError",
+        "Decision",
+        "Execution",
+        "InvalidRequestError",
+        "PipelineResult",
+        "RegistrationError",
+        "SecurityPolicy",
+        "SentinelClient",
+        "SentinelConfig",
+        "SentinelError",
+        "Severity",
+        "ToolGrant",
+        "__version__",
+    ]
+    for name in sentinel.__all__:
+        assert hasattr(sentinel, name)

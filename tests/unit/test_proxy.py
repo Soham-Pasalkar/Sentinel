@@ -1103,5 +1103,5 @@ def test_no_clock_files_or_randomness_beyond_injected_interfaces(tmp_path, monke
 
 
 def test_proxy_is_internal():
-    assert sentinel.__all__ == ["__version__"]
+    assert not {"ExecutionProxy", "ProxyRun", "ToolCallGuard"} & set(sentinel.__all__)
     assert not hasattr(sentinel, "ExecutionProxy")

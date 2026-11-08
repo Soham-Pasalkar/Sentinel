@@ -338,7 +338,7 @@ async def test_findings_through_the_async_entry_still_deny(make_env):
 
 
 def test_async_entry_is_internal():
-    # AT-34 (C-11 part): nothing is exported.
-    assert sentinel.__all__ == ["__version__"]
+    # AT-34 (C-11 part): neither the pipeline nor its async entry is exported.
+    assert not {"Pipeline", "build_pipeline", "evaluate_async"} & set(sentinel.__all__)
     assert not hasattr(sentinel, "Pipeline")
     assert not hasattr(sentinel, "evaluate_async")

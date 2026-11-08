@@ -398,5 +398,7 @@ def test_refusals_are_sentinel_errors_not_policy_denials():
 
 
 def test_path_guard_is_internal():
-    assert sentinel.__all__ == ["__version__"]
+    assert not {"canonicalise", "is_contained", "register_prefixes", "reverify"} & set(
+        sentinel.__all__
+    )
     assert not hasattr(sentinel, "canonicalise")

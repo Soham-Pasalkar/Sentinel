@@ -754,5 +754,5 @@ def test_engine_requires_a_security_policy():
 
 
 def test_policy_engine_is_internal():
-    assert sentinel.__all__ == ["__version__"]
+    assert "PolicyEngine" not in sentinel.__all__
     assert not hasattr(sentinel, "PolicyEngine")

@@ -373,5 +373,5 @@ def test_errors_never_contain_names_or_metadata(registry):
 
 
 def test_registry_is_internal():
-    assert sentinel.__all__ == ["__version__"]
+    assert not {"ToolRegistry", "RegisteredTool"} & set(sentinel.__all__)
     assert not hasattr(sentinel, "ToolRegistry")

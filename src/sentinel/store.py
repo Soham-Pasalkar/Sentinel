@@ -285,25 +285,38 @@ class AuditStore:
 
     # -------------------------------------------------------------- reads
 
-    def read(self, request_id: str | None = None) -> tuple[AuditRow, ...]:
+    def read(
+        self, request_id: str | None = None, *, limit: int | None = None
+    ) -> tuple[AuditRow, ...]:
         """Return committed rows ordered by ``seq``, optionally for one request.
+
+        Args:
+            request_id: only this request's rows, if given.
+            limit: at most this many rows (the first in ``seq`` order), applied
+                as an SQL ``LIMIT`` so no more rows are loaded (D-17). ``None``
+                reads every matching row, as reconstruction needs.
 
         Raises:
             AuditUnavailableError: the store is closed or cannot be read.
         """
         if request_id is not None and type(request_id) is not str:
             raise TypeError("request_id must be a str")
+        if limit is not None and (type(limit) is not int or limit < 1):
+            raise ValueError("limit must be a positive int")
+        sql = _SELECT
+        params: tuple[object, ...] = ()
+        if request_id is not None:
+            sql += " WHERE request_id = ?"
+            params = (request_id,)
+        sql += " ORDER BY seq"
+        if limit is not None:
+            sql += " LIMIT ?"
+            params += (limit,)
         with self._lock:
             if self._closed:
                 raise AuditUnavailableError("audit store is closed")
             try:
-                if request_id is None:
-                    cursor = self._conn.execute(_SELECT + " ORDER BY seq")
-                else:
-                    cursor = self._conn.execute(
-                        _SELECT + " WHERE request_id = ? ORDER BY seq", (request_id,)
-                    )
-                rows = cursor.fetchall()
+                rows = self._conn.execute(sql, params).fetchall()
             except sqlite3.Error:
                 raise AuditUnavailableError("audit events could not be read") from None
         return tuple(AuditRow(*row) for row in rows)

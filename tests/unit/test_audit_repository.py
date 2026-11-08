@@ -333,6 +333,19 @@ def test_store_executes_only_insert_select_and_setup_sql(db):
     )
 
 
+def test_bounded_read_returns_the_first_rows_and_validates_limit(logger):
+    # D-17: the limit is part of the query; reconstruction keeps limit=None.
+    for i in range(5):
+        logger.record(REQUEST_RECEIVED, request_id="r" if i % 2 else "s")
+    store = logger.store
+    assert [r.seq for r in store.read(limit=2)] == [1, 2]
+    assert [r.seq for r in store.read("r", limit=1)] == [2]
+    assert len(store.read()) == 5
+    for bad in (0, -1, True, 1.5, "2"):
+        with pytest.raises(ValueError):
+            store.read(limit=bad)
+
+
 def test_earlier_rows_are_unchanged_by_later_inserts(logger):
     first = logger.record(REQUEST_RECEIVED, request_id="r1", detail={"k": "v"})
     for i in range(20):
