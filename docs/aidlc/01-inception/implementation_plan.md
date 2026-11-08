@@ -171,11 +171,12 @@
 - **Tests:** `unit/test_path_guard.py`; optional Hypothesis property test (accepted ⇒ contained by component).
 - **Security invariants:** SEC-007.
 - **Evidence:** pytest output from both OSes.
-- **Rev. 8 status: implemented (2026-11-08); macOS evidence only, Linux NOT_VERIFIED.**
+- **Rev. 8 status: implemented (2026-11-08); Linux and macOS verified in CI (rev. 10).**
   - Code: `src/sentinel/paths.py` (internal, not exported): `canonicalise`, `is_contained`, `register_prefixes` (the prefix registration helper; warns on empty or missing prefixes and on the root prefix), `reverify` (the C2.7 re-resolution used by the proxy in C-10), `require_path_support` (D-21 Windows refusal, used by the registry in C-05).
   - Tests: `tests/unit/test_path_guard.py`, 57 tests (56 pass, F15 strict xfail). The tests were also run against deliberately broken copies of the module (string-prefix containment, relative paths resolved, no re-resolution equality, no warnings, chained `OSError`, no Windows refusal, single string accepted as a prefix list, and others): every mutant fails at least one test.
   - Evidence (macOS, Python 3.11.14, project `.venv`): full suite 193 passed, 1 xfailed; `ruff check .` clean; `ruff format --check .` clean; `pip check` clean.
   - CI: `ubuntu-latest` and `macos-latest` added to the test matrix (D-21). The workflow triggers only on pushes to `main` and on pull requests, so **no CI run exists yet**; Linux evidence remains outstanding.
+  - **Rev. 10 update: Linux evidence obtained.** After the trigger fix (`fb4be1b`), GitHub Actions run 42456322322 on that commit passed every job: Ruff (lint and format), and pytest on `ubuntu-latest` and `macos-latest` × Python 3.11, 3.12, 3.13, each "193 passed, 1 xfailed" with no skips.
   - Function-level only (callers come later): F7/F8/F9 raise `InvalidRequestError` (C-06 maps it to `decision=None`, `INVALID_REQUEST`); F14/F16 via `reverify` (proxy wiring and spy counts in C-10); F19 as "contains nothing" plus the warning (policy DENY in C-08). The optional Hypothesis test is not written (Hypothesis not approved, D-22).
 
 ### C-05 — Tool registry
@@ -183,6 +184,12 @@
 - **Dependencies:** C-03. **Blocked by:** D-06, D-08, D-21 (all Approved; D-21 in rev. 8).
 - **Acceptance:** duplicate, missing-flag, missing-schema and bad-`path_args` registrations raise `RegistrationError`.
 - **Tests:** `unit/test_registry.py`. **Invariants:** SEC-014. **Evidence:** pytest output.
+- **Rev. 10 status: implemented (2026-11-08).**
+  - Code: `src/sentinel/registry.py` (internal, not exported): `ToolRegistry.register(name, *, arg_schema, destructive, path_args=(), sync_fn=None, async_fn=None) -> ToolSpec`, `lookup(name) -> RegisteredTool | None`, `specs()`; `RegisteredTool(spec, sync_fn, async_fn)` reports `supports_sync` / `supports_async`.
+  - Rules: unique, non-replaceable names (no replace or remove API; thread-safe check-and-insert); missing `arg_schema` or `destructive` → `RegistrationError` (not a Python `TypeError`); `ToolSpec` validation errors re-raised as a fixed-text `RegistrationError` without chaining; at least one entry point; the sync entry point must not be a coroutine, generator or async-generator function (calling those would not run the tool body); the async entry point must be a coroutine function; a path-constrained tool on Windows → `ConfigurationError` via `paths.require_path_support()` (D-21), while tools without `path_args` register normally; nothing is called at registration.
+  - Not in C-05 (by the contracts): allowed path prefixes belong to grants (C-07, blocked by D-24b), so empty-grant and root-prefix behaviour stays covered by the C-04 tests (F19, explicit root); strict validation of request arguments is the gateway (C-06); a signature-vs-schema compatibility check at registration is **not** a documented rule and is not implemented.
+  - Tests: `tests/unit/test_registry.py`, 52 tests. Also run against 14 deliberately broken registries: 13 fail at least one test; the survivor (removing the explicit missing-`arg_schema` check) is behaviour-equivalent, because `ToolSpec` rejects the missing value with the same `RegistrationError`.
+  - Evidence: local macOS, Python 3.11.14: 245 passed, 1 xfailed; Ruff and format clean; `pip check` clean. Remote CI: see the C-05 commit's run.
 
 ### C-06 — Gateway: validation, strict arguments, canonicalisation
 - **Objective:** raw dict → frozen `SecurityRequest` plus the `AuthorizedAction` candidate.
@@ -339,3 +346,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 7 | Owner: operational refusals are not policy decisions; C-03 approved with `ToolGrant` excluded (four models moved to C-07); C-03 blocked on the Pydantic runtime dependency (options A/B in decision record §8.6); C-10 guard wording |
 | 8 | D-05, D-18, D-21 Approved (decision record rev. 8); C-04 and C-05 gates updated; stale C-01-only and "not committed" status lines corrected (C-03a and C-03 are in `153df80`) |
 | 9 | C-04 implemented: `paths.py`, 57 tests; CI matrix adds `macos-latest`; Linux evidence outstanding |
+| 10 | C-04 remote CI evidence (run on `fb4be1b`: Ruff and pytest on Linux and macOS × Python 3.11–3.13 all passed); C-05 implemented: `registry.py`, 52 tests |

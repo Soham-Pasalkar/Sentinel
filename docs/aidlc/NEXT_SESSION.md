@@ -1,6 +1,6 @@
 # Sentinel — Next-Session Resume Note
 
-Updated 2026-11-08 after C-04 (housekeeping commit). This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
+Updated 2026-11-08 after C-05. This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
 
 ## 1. Purpose and architecture (brief)
 
@@ -8,7 +8,7 @@ Sentinel is a planned in-process Python library that sits between AI agents and 
 
 Planned pipeline (decision record C1–C4): gateway → identity and grants → heuristic detection → deterministic policy → proxy (the sole executor) → output filtering. The pipeline is the sole audit writer. Framework integration is Design B, `wrap_tools` (D-12).
 
-**What exists today is the contract layer plus the path guard. No runtime enforcement exists yet:** no gateway, policy, proxy, audit store, pipeline, client API or adapter calls any of it. Sentinel protects no tool call today. The only public attribute is `sentinel.__version__`.
+**What exists today is the contract layer, the path guard and the tool registry. No runtime enforcement exists yet:** no gateway, policy, proxy, audit store, pipeline, client API or adapter calls any of it. Sentinel protects no tool call today. The only public attribute is `sentinel.__version__`.
 
 ## 2. Completed increments
 
@@ -20,11 +20,13 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 | Docs | D-07 … D-31, Q-03c, refusal semantics | `6c1ef3e` |
 | Decisions | **D-05, D-18, D-21 approved**; specs aligned | `f64c8f6` |
 | C-04 | Path guard [`src/sentinel/paths.py`](../../src/sentinel/paths.py) (internal); 57 tests; CI adds `macos-latest` | `847c337` |
+| Housekeeping | CI also triggers on pushes to `c01-project-scaffold`; this note committed | `fb4be1b` |
+| C-05 | Tool registry [`src/sentinel/registry.py`](../../src/sentinel/registry.py) (internal); 52 tests | the C-05 commit after `fb4be1b` (see `git log`) |
 
 ## 3. Repository state (verified 2026-11-08)
 
-- **Branch:** `c01-project-scaffold`. Last code commit `847c337` (C-04); this note and the CI trigger fix are in the housekeeping commit on top of it (see `git log`).
-- **Remote:** `https://github.com/Soham-Pasalkar/Sentinel`, branch `c01-project-scaffold` (pushed with owner authorization; local and remote agreed at `847c337` before the housekeeping commit).
+- **Branch:** `c01-project-scaffold`. HEAD is the C-05 commit, on top of `fb4be1b` (see `git log -3`).
+- **Remote:** `https://github.com/Soham-Pasalkar/Sentinel`, branch `c01-project-scaffold` (pushed with owner authorization; compare with `git fetch origin && git status -sb`).
   - The repository is **public**.
   - Because the repository was empty, GitHub made `c01-project-scaffold` the **default branch**.
   - No `main` exists on the remote or locally; nothing was merged.
@@ -34,12 +36,12 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 
 | Command | Result |
 |---|---|
-| `pytest` | **193 passed, 1 xfailed** (F15, strict). Per file: action 52, models 70, exceptions 12, scaffold 3, path guard 57 |
-| `ruff check .` / `ruff format --check .` | clean / 11 files formatted |
+| `pytest` | **245 passed, 1 xfailed** (F15, strict). Per file: action 52, models 70, exceptions 12, scaffold 3, path guard 57, registry 52 |
+| `ruff check .` / `ruff format --check .` | clean / 13 files formatted |
 | `python -m pip check` | no broken requirements |
 
-- **Mutation checks:** the path-guard tests were run against 16 deliberately broken copies of `paths.py`, and every copy failed at least one test.
-- **GitHub Actions: pending.** Until the housekeeping commit, the workflow triggered only on pushes to `main` and on pull requests, so no run exists for `847c337`. The workflow now also triggers on pushes to `c01-project-scaffold`; the first run (Ruff; pytest on `ubuntu-latest` and `macos-latest` × Python 3.11, 3.12, 3.13) is the first remote evidence. Check it with `gh run list` before relying on Linux results.
+- **Mutation checks:** path guard: 16 of 16 broken copies caught. Registry: 13 of 14 caught; the survivor is behaviour-equivalent (see the implementation plan, C-05).
+- **GitHub Actions (remote evidence):** run 42456322322 on `fb4be1b` (through C-04) passed every job: Ruff lint and format; pytest on `ubuntu-latest` and `macos-latest` × Python 3.11, 3.12, 3.13, each "193 passed, 1 xfailed", no skips. **The C-05 commit's run must be checked separately** (`gh run list --branch c01-project-scaffold`).
 
 ## 5. Decisions
 
@@ -59,15 +61,17 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 | D-16 / D-17 | C-11 / C-12 |
 | D-10, D-24e, D-24g, D-24h, D-02 verification | later increments or release |
 
-## 6. Next increment: C-05, tool registry (entry criteria met)
+## 6. Next increment: C-06, gateway (entry criteria met)
 
-- **Gate:** C-05 depends on C-03 (done) and is blocked by D-06, D-08 and D-21, all now Approved. After C-05, **C-06 (gateway)** is also unblocked: it needs C-03, C-04 and C-05, plus D-04, D-08 and D-18, all Approved.
-- **Scope:** `registry.py`.
-  - Register a tool: the name is unique and not replaceable, and `arg_schema` and `destructive` are required. A registration may hold a sync callable, an async callable, or both.
-  - Validate `path_args` (already checked by `ToolSpec`).
-  - Refuse path-constrained tools on Windows via `paths.require_path_support()`.
-  - Look up `(ToolSpec, callable)`; list specs read-only.
-- **Acceptance:** duplicate, missing-flag, missing-schema and bad `path_args` registrations raise `RegistrationError`. `ToolSpec`'s Pydantic `ValidationError` must be converted without echoing input values. Invariant SEC-014. Tests in `tests/unit/test_registry.py`.
+- **Gate:** C-06 depends on C-03, C-04 and C-05 (all done) and is blocked by D-04, D-08 and D-18 (all Approved).
+- **Scope (implementation plan C-06):** `gateway.py`, turning a raw dict into a frozen `SecurityRequest` plus the `AuthorizedAction` candidate:
+  - shape validation; the tool must be registered (`ToolRegistry.lookup`);
+  - reserved identity keys rejected (D-04);
+  - strict `arg_schema` validation, extra keys forbidden (D-08);
+  - path arguments validated and canonicalised with `paths.canonicalise` (C2.3, C2.4);
+  - sanitised errors with no input values.
+- **Acceptance:** FR-001, FR-003, FR-004. Relative, `~`, NUL and empty paths → `decision=None`, `INVALID_REQUEST` (closes F7–F9 at gateway level). The canonical path appears in the action; a canary from an invalid field is absent from errors. AT-31 and AT-36 (gateway parts). Tests in `tests/unit/test_gateway.py`.
+- **Note for C-06:** the registry only enforces `extra="forbid"`; strictness comes from validating with `model_validate(..., strict=True)`. Checked with Pydantic 2.14.1: `strict=True` at validation time rejects `"1"` for an `int` field even when the field declares `strict=False`. Keep a gateway test for this.
 
 ## 7. Security constraints not to forget
 
@@ -81,14 +85,15 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 
 ## 8. Known limitations and gaps
 
-- **No enforcement yet.** The path guard has no callers.
+- **No enforcement yet.** The path guard and the registry have no callers.
 - **Function level only so far:**
   - F7–F9 at the gateway (C-06);
   - F14 and F16 at the proxy, with spy counts (C-10);
   - F19 as a policy DENY (C-08).
 - **Path guard limits** (documented, not defended): the window after `reverify` (F15, strict xfail); hard links (F17); paths a tool derives internally; case differences, which fail closed; mount boundaries. It is not a sandbox.
+- **Registry limits:** entry points are checked by kind only (sync vs coroutine function), not by signature against the schema, which is not a documented rule. A callable object with an `async __call__` is refused as an async entry point (fails closed). The registry is in-memory and per instance; "no mutation reachable from the tool-call path" (SEC-014) also depends on C-10 and C-11 passing it read-only use only.
 - **Not yet in place:**
-  - remote CI evidence pending (see §4); Linux unverified until then;
+  - remote CI covers commits through C-04 (see §4); confirm the C-05 run;
   - no mypy, coverage or Hypothesis (D-22 remainder).
 - **Doc housekeeping still open:**
   - §15 of `testing_strategy.md` still shows PROD-TODO for the C-03 model parts of AT-36, AT-40, AT-41, AT-44 and AT-46. Trace each to a named test before marking it.

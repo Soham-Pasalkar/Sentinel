@@ -16,7 +16,7 @@ At this stage the repository holds only the package scaffold, development toolin
 | Identity and capability grants | not started |
 | Filesystem path authorization | path guard implemented (internal, not exported; C-04): canonicalisation, containment, prefix registration, re-verification. Not yet used by any gateway, policy or proxy, so it enforces nothing yet |
 | Policy engine | not started |
-| Tool registry and execution proxy | not started |
+| Tool registry and execution proxy | tool registry implemented (internal, not exported; C-05): unique names, required schema and `destructive`, sync/async entry points, Windows refusal of path tools. Execution proxy not started |
 | Audit log | not started |
 | Pipeline and public client API | not started |
 | Threat detection (heuristic) | not started |
@@ -46,7 +46,7 @@ The full list is in the decision register.
 
 ## Requirements
 
-- Python 3.11 or newer. CI is configured to test 3.11, 3.12 and 3.13 on Linux (`ubuntu-latest`) and macOS (`macos-latest`); it has not yet run on GitHub.
+- Python 3.11 or newer. CI tests 3.11, 3.12 and 3.13 on Linux (`ubuntu-latest`) and macOS (`macos-latest`) on every push to the development branch and on pull requests.
 
 ## Local development setup
 
@@ -69,7 +69,7 @@ ruff check .               # lint
 ruff format --check .      # formatting check (use `ruff format .` to apply)
 ```
 
-The same commands are configured to run in GitHub Actions (`.github/workflows/ci.yml`) on every push to `main` and on every pull request. The workflow has not yet run remotely, so it is unverified.
+The same commands run in GitHub Actions (`.github/workflows/ci.yml`) on every push to `main` or `c01-project-scaffold` and on every pull request.
 
 ## Package name
 
