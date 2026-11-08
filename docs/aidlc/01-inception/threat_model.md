@@ -5,7 +5,7 @@
 | Phase | Inception (initial model; revisit at the end of M1, M2 and M5) |
 | Date | 2026-10-28 |
 | Method | Asset- and attacker-centred threat enumeration over the enforcement sequence in `architecture_assessment.md` §4, with STRIDE categories as a checklist |
-| Status | Draft rev. 8 — pending owner review. **Rev. 8** (2026-11-08, D-24a and D-15 Approved) notes in T-04 that no detector result is ever an authorization. **Rev. 7** (2026-11-08, D-24b Approved) notes in T-02 that grants are tool-level. Rev. 6 — **Rev. 6** (Q-03c) updates the T-16 mitigation wording. *Rev. 5* added the T-03 credentials note (header not updated at the time). Rev. 4 updates T-17 and T-18 and adds T-21. Rev. 2 updated T-03, T-06, T-07, T-09, T-11, T-12. **Rev. 3** (after C-02/C-02b) updates T-12 and adds T-17–T-20, for the contracts in [`decision_record.md`](decision_record.md) C1.4, C1.6, C3.5, C3.6 |
+| Status | Draft rev. 9 — pending owner review. **Rev. 9** (2026-11-08, D-19 and D-31 defaults Approved) notes guard defaults and process-local scope in T-17, T-18 and T-21, and the filter-failure rule in T-16. **Rev. 8** (2026-11-08, D-24a and D-15 Approved) notes in T-04 that no detector result is ever an authorization. **Rev. 7** (2026-11-08, D-24b Approved) notes in T-02 that grants are tool-level. Rev. 6 — **Rev. 6** (Q-03c) updates the T-16 mitigation wording. *Rev. 5* added the T-03 credentials note (header not updated at the time). Rev. 4 updates T-17 and T-18 and adds T-21. Rev. 2 updated T-03, T-06, T-07, T-09, T-11, T-12. **Rev. 3** (after C-02/C-02b) updates T-12 and adds T-17–T-20, for the contracts in [`decision_record.md`](decision_record.md) C1.4, C1.6, C3.5, C3.6 |
 
 ## 1. System under analysis
 
@@ -181,6 +181,7 @@ An in-process Python library sitting between agent frameworks and registered too
 - **Mitigations (deterministic):** invalid configuration raises; any stage exception before execution ⇒ *(rev. 1–5: DENY `INTERNAL_ERROR`)* **rev. 6 (Q-03c):** `decision=None`, `error_code="INTERNAL_ERROR"`, `execution="not_started"`, no output. It still fails closed, and is no longer mislabelled as a policy denial (SEC-009, SEC-033, CF-01, CF-06).
 - **Requirements:** SEC-009, FR-009.
 - **Tests:** a fault-injection test per stage; invalid-config tests.
+- **Rev. 9 (D-19 failure rule Approved):** an output-filter failure withholds the output, keeps `execution="succeeded"` and the `allow` decision, returns `OUTPUT_FILTER_FAILED`, and never retries the tool. Until C-14 the filter is an explicit pass-through, not a security filter.
 - **Residual:** low.
 
 ### T-17 — Framework retry repeats a side effect (rev. 3)
@@ -189,6 +190,7 @@ An in-process Python library sitting between agent frameworks and registered too
 - **Mitigations (deterministic):** the adapter converts post-execution failures into fixed-text in-tool `ToolException`s, so no exception reaches the retry mechanism (SEC-026, D-26). No Sentinel path re-invokes a claimed request (C1.7). Defense in depth: at-most-once per `(agent_id, session_id, tool_call_id)` (SEC-025, D-27).
 - **Requirements:** SEC-025, SEC-026, NI-18.
 - **Tests:** AT-04, AT-05, AT-11, AT-12, AT-25.
+- **Rev. 9 (D-31 defaults Approved):** TTL 300 s after the terminal state; in-flight entries never expire; 10,000 entries. A framework retry with the same id more than 300 s after the first call **finished** is treated as new (documented limitation). The guard is process-local: a retry handled by another worker or host is not detected.
 - **Residual:** retry mechanisms other than the two tested; a **new** call with a **new** `tool_call_id` (model-driven repeat) executes again by design; uniqueness of real provider ids is untested. Non-idempotent tools remain a deployment risk.
   - *Rev. 3 also listed "guard eviction (D-31)".* **Rev. 4:** eviction of unexpired entries is forbidden (D-31 Approved). The remaining guard residuals are: a repeat after the entry's TTL (counted from the terminal state) or after a process restart; and availability loss when capacity is exhausted (T-21). No exactly-once external effect is claimed.
 
@@ -198,6 +200,7 @@ An in-process Python library sitting between agent frameworks and registered too
 - **Mitigations (deterministic):** atomic single-use claim with no `await` or I/O between check and mark, shared by the sync and async paths (SEC-024, D-25); exact-action digest binding (D-07, **Approved in rev. 4**). The digest is deterministic across processes and covers every nested argument and resolved path; `tool_call_id` is excluded (SEC-032).
 - **Requirements:** SEC-024, SEC-010, SEC-021, NI-16.
 - **Tests:** AT-01–AT-03 (including the racy test double that must fail), AT-22, AT-23, AT-28–AT-31.
+- **Rev. 9:** the single-use key is the action digest (covers `request_id`), so a copied or reconstructed decision is refused; claims are process-local and kept for the proxy's lifetime.
 - **Residual:** claims are per process (single-process scope); in-process code can still forge or bypass (T-11).
 
 ### T-19 — Interruption after a tool starts (rev. 3)
@@ -236,6 +239,7 @@ An in-process Python library sitting between agent frameworks and registered too
   - The denial is audited, so it is visible.
 - **Requirements:** SEC-025, FR-019.
 - **Tests:** AT-26, AT-35.
+- **Rev. 9:** default capacity 10,000 entries; at capacity new guarded calls fail closed with `GUARD_CAPACITY_EXHAUSTED`.
 - **Residual:** **accepted by design:** the owner chose fail-closed over eviction. A single process-wide capacity means one noisy session can exhaust it for others; per-session quotas are not in v1.
 
 ## 6. Threat → requirement → test matrix (summary)

@@ -27,7 +27,7 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
 | Decisions | **D-24b approved** (tool-level grants); C-07 interpretations I-1–I-7 | `7efb7f2` |
 | C-07 | Identity and grants [`src/sentinel/identity.py`](../../src/sentinel/identity.py), four models in `models.py`; 97 tests | `25dad4f` |
 | Decisions | **D-24a, D-15 approved**; I-1–I-7 confirmed; C-08 interpretations I-8–I-11 | `deab308` |
-| C-08 | Policy engine [`src/sentinel/policy.py`](../../src/sentinel/policy.py); 96 tests | the C-08 commit after `deab308` (see `git log`) |
+| C-08 | Policy engine [`src/sentinel/policy.py`](../../src/sentinel/policy.py); 96 tests | `cc27883` |
 
 ## 3. Repository state (verified 2026-11-08)
 
@@ -52,7 +52,7 @@ Planned pipeline (decision record C1–C4): gateway → identity and grants → 
   - run 42456612529 on `95a11c5` (C-05): 245 passed, 1 xfailed per job;
   - run 42457691978 on `124fb2e` (C-06): 353 passed, 1 xfailed per job;
   - run 42461535297 on `25dad4f` (C-07): 450 passed, 1 xfailed per job;
-  - **the C-08 commit's run must be checked** (`gh run list --branch c01-project-scaffold`).
+  - run 42463102989 on `cc27883` (C-08): 546 passed, 1 xfailed per job.
 
 ## 5. Decisions
 
@@ -106,7 +106,7 @@ Every remaining increment needs at least one unapproved decision (implementation
 - **Identity limits:** credentials are plain SHA-256 digests, which suits high-entropy tokens such as API keys, not passwords. The constant-time comparison is best effort (a dict lookup still precedes it). Grants are tool-level (D-24b), so a granted tool is trusted with everything its validated arguments allow (T-02). Rate-limited grants are refused until C-15. Agents are registered once, with no disable-later or rotation API.
 - **Policy limits:** rate limits (row 5) are not evaluated until C-15; `risk_score` is not computed (no approved formula); a `ToolSpec` with the right name but wrong metadata cannot be detected by policy, because the pipeline must pass the registry's spec (D-15). A decision is not enforcement until the proxy (C-10) executes only `decision.action` after re-verification.
 - **Not yet in place:**
-  - remote CI verified through C-07; confirm the C-08 run (see §4);
+  - remote CI verified through C-08 (see §4);
   - no mypy, coverage or Hypothesis (D-22 remainder).
 - **Doc housekeeping still open:**
   - §15 of `testing_strategy.md` still shows PROD-TODO for the C-03 model parts of AT-36, AT-40, AT-41, AT-44 and AT-46. Trace each to a named test before marking it.

@@ -50,7 +50,7 @@
 - C-03 ← D-03, D-04, D-06, D-08, D-14 (remainder), D-15, D-24c, D-24d, **D-24i** (added in rev. 4; D-24b too if `ToolGrant` stays in C-03). Authoritative checklist: `decision_record.md` §8.6;
 - C-04 ← D-05, D-18, D-21 (**all Approved, rev. 8**);
 - C-09 ← D-09, D-11, D-24f (D-29 Approved);
-- C-10 ← D-14, D-19, **D-31 default values** (TTL, capacity) (D-07, D-25, D-27, D-31 Approved);
+- C-10 ← D-14, D-19, **D-31 default values** (TTL, capacity) (D-07, D-25, D-27, D-31 Approved); **rev. 16: D-19 failure rule and D-31 defaults Approved (TTL 300 s after the terminal state, 10,000 entries).**
 - C-11 ← D-16, D-20 (D-30 Approved: internal entry);
 - C-16 ← D-04 (D-12, D-26, D-30, D-31 and FR-022 Approved). **Implementing first and deciding later is not permitted** for these.
 
@@ -251,7 +251,7 @@
   - state machine `claimed → entered → completed | failed | interrupted`;
   - `BaseException` after `entered` → `interrupted`, re-raised;
   - forwarding of `InjectedToolCallId` outside the evaluated action.
-- **Dependencies:** C-03, C-04, C-05, C-08. **Blocked by:** D-14 (remainder), D-19 (failure rule), D-31 default values (D-07 and D-31 Approved in rev. 4).
+- **Dependencies:** C-03, C-04, C-05, C-08. **Blocked by:** D-14 (remainder), D-19 (failure rule), D-31 default values (D-07 and D-31 Approved in rev. 4). **Rev. 16: all Approved (D-14 complete; D-19 failure rule; D-31 defaults); C-10 may start.** Interpretations I-12 to I-17 (decision record, D-24) fill the remaining gaps, the main one being the two-phase `claim` / `execute` split required by the C4.3 event order.
 - **Acceptance:** NI-08, NI-09, NI-13; F14, F16; tool error → `failed` with no message; filter error → withheld. **Rev. 3:** NI-16; AT-01, AT-02, AT-03 (including the non-atomic test double that must fail), AT-06, AT-07, AT-22, AT-23, AT-25 (proxy part), AT-26 (capacity fails closed, no eviction), **AT-30 (guard part), AT-35** (rev. 4).
 - **Tests:** `unit/test_proxy.py`, `security/test_action_integrity.py`, `integration/test_proxy_filesystem.py`, **`security/test_claim_concurrency.py`, `unit/test_tool_call_guard.py`** (rev. 3).
 - **Invariants:** SEC-002, SEC-003, SEC-010, SEC-011, SEC-017, SEC-021, **SEC-024, SEC-025**. **Evidence:** pytest output, including repeated runs of the concurrency tests.
@@ -372,3 +372,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 13 | C-07 implemented: four models in `models.py`, `identity.py`, 97 tests |
 | 14 | D-24a and D-15 Approved, I-1 to I-7 confirmed; C-08 unblocked |
 | 15 | C-08 implemented: `policy.py`, 96 tests |
+| 16 | D-19 failure rule and D-31 defaults Approved; C-10 unblocked |
