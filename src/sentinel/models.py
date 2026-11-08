@@ -1,10 +1,9 @@
-"""Core Sentinel models and result semantics (C-03).
+"""Core Sentinel models and result semantics (C-03, C-07).
 
-Implements decision record C1.2 (request), C1.3 (tool metadata), C1.4/C1.5
-(decisions), C1.6 (result model, including the Q-03c internal-error and the
-rev. 6 operational-refusal semantics). ``ToolGrant``, ``RateLimit``,
-``CapabilityEnvelope`` and ``SecurityContext`` are deliberately absent: they
-wait for decision D-24b (C-07).
+Implements decision record C1.2 (request; grants and identity context, added
+in C-07 after D-24b), C1.3 (tool metadata), C1.4/C1.5 (decisions), C1.6
+(result model, including the Q-03c internal-error and the rev. 6
+operational-refusal semantics).
 
 Key rule: ``decision`` holds only an actual policy decision. Operational
 refusals and internal errors carry ``decision=None`` with a specific
@@ -36,17 +35,22 @@ from pydantic import (
 from sentinel.action import AuthorizedAction
 
 __all__ = [
+    "CapabilityEnvelope",
     "Decision",
     "Execution",
     "PipelineResult",
+    "RateLimit",
+    "SecurityContext",
     "SecurityDecision",
     "SecurityFinding",
     "SecurityRequest",
     "Severity",
+    "ToolGrant",
     "ToolSpec",
 ]
 
 NonEmptyStr = Annotated[str, StringConstraints(min_length=1)]
+PositiveInt = Annotated[int, Field(gt=0)]
 
 # --------------------------------------------------------------------------- codes
 
@@ -196,6 +200,89 @@ class ToolSpec(BaseModel):
         for name in self.path_args:
             if name not in fields or fields[name].annotation is not str:
                 raise ValueError("path_args must name top-level str fields")
+        return self
+
+
+class RateLimit(BaseModel):
+    """A call limit for one granted tool (C1.2; enforced from M4, C-15).
+
+    Modelled now; a grant carrying one is refused until C-15 enforces it
+    (decision record D-24, interpretation I-3).
+    """
+
+    model_config = _CONFIG
+
+    max_calls: PositiveInt
+    window_seconds: PositiveInt
+
+
+class ToolGrant(BaseModel):
+    """Permission for an agent to use one whole registered tool (D-24b).
+
+    ``tool`` is the registered name (the tool's identity, D-07). A grant is not
+    an ALLOW: every call is still validated and evaluated by policy. There are
+    no sub-action or argument-level grants. ``allowed_path_prefixes`` applies
+    to path tools only; empty means every path is denied (D-05).
+    """
+
+    model_config = _CONFIG
+
+    tool: NonEmptyStr
+    allowed_path_prefixes: tuple[NonEmptyStr, ...] = ()
+    rate_limit: RateLimit | None = None
+
+
+class CapabilityEnvelope(BaseModel):
+    """The grants of one agent (C1.2); at most one grant per tool."""
+
+    model_config = _CONFIG
+
+    agent_id: NonEmptyStr
+    grants: tuple[ToolGrant, ...] = ()
+
+    @model_validator(mode="after")
+    def _unique_tools(self) -> CapabilityEnvelope:
+        """Reject two grants for the same tool (they could disagree)."""
+        tools = [grant.tool for grant in self.grants]
+        if len(tools) != len(set(tools)):
+            raise ValueError("envelope has more than one grant for a tool")
+        return self
+
+    def grant_for(self, tool: str) -> ToolGrant | None:
+        """Return the grant for exactly the registered name ``tool``, if any.
+
+        A lookup, not a decision: policy row 2 (C-08) interprets the result.
+        """
+        if type(tool) is not str:
+            return None
+        for grant in self.grants:
+            if grant.tool == tool:
+                return grant
+        return None
+
+
+class SecurityContext(BaseModel):
+    """Authentication facts about the requesting agent (C1.2; C-07).
+
+    Identity sets ``authorized``; it never decides ALLOW or DENY (policy row 1
+    does). An unauthorized context carries no envelope.
+    """
+
+    model_config = _CONFIG
+
+    agent_id: NonEmptyStr
+    user_id: NonEmptyStr | None = None
+    authorized: bool
+    envelope: CapabilityEnvelope | None = None
+
+    @model_validator(mode="after")
+    def _check_envelope(self) -> SecurityContext:
+        """Only an authorized agent has an envelope, and only its own."""
+        if self.envelope is not None:
+            if not self.authorized:
+                raise ValueError("an unauthorized context carries no envelope")
+            if self.envelope.agent_id != self.agent_id:
+                raise ValueError("envelope belongs to a different agent")
         return self
 
 

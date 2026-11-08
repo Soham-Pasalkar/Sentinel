@@ -13,7 +13,7 @@ At this stage the repository holds only the package scaffold, development toolin
 | Package scaffold, tests, lint, CI (increment C-01) | implemented |
 | Core models and contracts | implemented (internal, not exported): action record and digest (C-03a), models and exceptions (C-03) |
 | Request validation (gateway) | implemented (internal, not exported; C-06): request shape, registered tool, reserved identity keys, strict schema validation, canonical paths, action candidate. Not yet called by any pipeline |
-| Identity and capability grants | not started |
+| Identity and capability grants | implemented (internal, not exported; C-07): agent registry with per-agent credentials (digest only, `require_credentials=True` by default), tool-level grants (D-24b), path prefixes via the path guard. Produces authentication facts; no policy decisions yet |
 | Filesystem path authorization | path guard implemented (internal, not exported; C-04): canonicalisation, containment, prefix registration, re-verification. Not yet used by any gateway, policy or proxy, so it enforces nothing yet |
 | Policy engine | not started |
 | Tool registry and execution proxy | tool registry implemented (internal, not exported; C-05): unique names, required schema and `destructive`, sync/async entry points, Windows refusal of path tools. Execution proxy not started |

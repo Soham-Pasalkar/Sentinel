@@ -156,3 +156,4 @@ Contract → requirement → test: `decision_record.md` §5 and `testing_strateg
 | 8 | 2026-10-28 | NFR-002 Pydantic part Approved; C-03 implemented (decision record §8.6 rev. 7) |
 | 9 | 2026-11-08 | D-05, D-18, D-21 Approved (decision record §12). **Approved:** SEC-007 (Windows wording narrowed to path-constrained tools; limitations stated), NFR-012 (rewritten), FR-004 path part, FR-010 prefix rules |
 | 10 | 2026-11-08 | D-24b Approved (decision record §12): FR-007 notes tool-level grants. SEC-001 stays Pending D-24a (default-deny policy behaviour) |
+| 11 | 2026-11-08 | C-07 implemented the identity parts of FR-005, FR-006 and FR-007 (`authorized=False` facts, credentials, envelope). Their acceptance outcomes (DENY `UNAUTHORIZED_AGENT` / `UNAUTHORIZED_TOOL`, not invoked) need policy (C-08) and the pipeline (C-11); statuses unchanged |

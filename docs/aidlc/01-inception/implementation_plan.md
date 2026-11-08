@@ -211,6 +211,12 @@
 - **Dependencies:** C-03; C-04 (prefix registration helper for grants); C-05 (the registry, used to check grants name registered tools and whether a tool takes paths; interpretation I-1, I-2). **Blocked by:** D-04, D-05 (both Approved), D-24b (Approved, rev. 12).
 - **Acceptance:** FR-005–007; grant with a non-existent prefix → `ConfigurationError`; empty prefixes allowed at registration with a warning.
 - **Tests:** `unit/test_identity.py`. **Invariants:** identity never decides. **Evidence:** pytest output.
+- **Rev. 13 status: implemented (2026-11-08).**
+  - Models in `src/sentinel/models.py` (frozen, strict, extra fields refused): `RateLimit{max_calls, window_seconds}` (positive ints), `ToolGrant{tool, allowed_path_prefixes=(), rate_limit=None}`, `CapabilityEnvelope{agent_id, grants=()}` (at most one grant per tool; `grant_for(name)` is an exact-name lookup), `SecurityContext{agent_id, user_id=None, authorized, envelope=None}` (an envelope only when authorized, and only the agent's own).
+  - `src/sentinel/identity.py` (internal): `IdentityStore(registry, *, require_credentials=True)` with `register_agent(agent_id, *, credential=None, user_id=None, disabled=False, grants=())` and `authenticate(request) -> SecurityContext`. Applies D-04, FR-006 and interpretations I-1 to I-7 (decision record D-24): SHA-256 digest only, `hmac.compare_digest` on every call (also against a fixed digest), unknown, disabled or unauthenticated → `authorized=False` with no envelope or `user_id`; grants checked against the registry; path prefixes through `paths.register_prefixes`; prefixes on non-path tools refused; rate-limited grants refused until C-15; no replace, remove or read API.
+  - Not in C-07: DENY `UNAUTHORIZED_AGENT` / `UNAUTHORIZED_TOOL` / `RESTRICTED_PATH` (policy rows 1–3, C-08); path containment (C-08); rate-limit enforcement (C-15); `SecurityPolicy` (C-08; `require_credentials` is passed in, I-6).
+  - Tests: `tests/unit/test_identity.py`, 97 tests. Also run against 26 deliberately broken versions of `identity.py` and the models (credential checks, grant matching, envelope invariants, registration rules). The first run left 2 survivors, both real gaps: a missing-token path that could match a credential equal to the placeholder's input, and unknown agents with `require_credentials=False`. Tests were added; both are now caught.
+  - Evidence: local macOS, Python 3.11.14: 450 passed, 1 xfailed; Ruff and format clean; `pip check` clean. Remote CI: see the C-07 commit's run.
 
 ### C-08 — Policy engine
 - **Scope:** `policy.py`: `SecurityPolicy`; `PolicyEngine.evaluate(request, context, findings, tool_spec)` rows 1–4, 6, 7; pure; embeds the action in the decision.
@@ -356,3 +362,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 10 | C-04 remote CI evidence (run on `fb4be1b`: Ruff and pytest on Linux and macOS × Python 3.11–3.13 all passed); C-05 implemented: `registry.py`, 52 tests |
 | 11 | C-06 implemented: `gateway.py`, 108 tests |
 | 12 | D-24b Approved; C-07 gate and dependencies updated (C-05 added as a dependency for grant checks); C-08 open blockers narrowed to D-15 remainder and D-24a |
+| 13 | C-07 implemented: four models in `models.py`, `identity.py`, 97 tests |
