@@ -311,6 +311,14 @@
   - Evidence: local macOS, Python 3.11.14: 933 passed, 1 xfailed (also with `RuntimeWarning` as an error); Ruff and format clean; `pip check` clean. Remote CI: see the C-11 commit's run.
   - Not in C-11: the public `SentinelClient` and `audit_events()` (C-12); detection (C-13); real output filtering (C-14); rate limits (C-15); the adapter (C-16).
 
+#### C-11 remediation: I-28 async cancellation lifecycle (rev. 25)
+- **Authorization:** the owner, 2026-11-18 (decision record §12, rev. 16), "as C-11 remediation evidence for the G-M1 review", after five design-review rounds. Approved with it: K3 (C1.6 amendment for coroutine finalization), K4 (deferred guard retirement), K1 and K1b (`INTERNAL_ERROR` mappings), K2 (worker-side record before entry), D-BOUND, D-LOG, C1.6-I, and the I-28 and I-29 texts.
+- **Defect:** the async entry's clean-up after a cancelled caller ran as event-loop callbacks. When the loop was torn down (end of `asyncio.run`, a closed loop, a shut-down executor) they never ran: claimed runs kept guard entries in flight forever and requests had no REQUEST_COMPLETED. A completion awaited without a shield was also lost on cancellation.
+- **Change (`pipeline.py`, `proxy.py` only):** executor jobs that return `_JobResult` values and never raise; `_Handoff`, a per-request lock deciding who closes a claimed run; an in-step check (`asyncio.current_task(loop)` against the Task captured at entry) that makes finalization do no blocking work; `ToolCallGuard.retire_deferred` (a `queue.SimpleQueue`) and `ProxyRun.abandon_deferred()`; K1/K1b results; the record before entry submitted to a worker. The two loop-callback methods were removed. No runtime dependency, no public API.
+- **Tests (149 new):** `tests/unit/test_pipeline_handoff.py` (93), `tests/unit/test_guard_deferred.py` (10), `tests/integration/test_pipeline_cancellation.py` (40), `tests/integration/test_pipeline_finalization.py` (6, subprocesses). Existing tests unchanged and passing. Mutation checks: testing strategy §16.
+- **Evidence (local, macOS, Python 3.11.14):** 1207 passed, 1 xfailed (also with `RuntimeWarning` as an error); branch coverage `pipeline.py` 124/132 (93.94%), `proxy.py` 105/110 (95.45%), overall 640/660 (96.97%), NFR-006 check passed; Ruff and format clean. Python 3.12 and 3.13: only from CI on the pushed commit (`NEXT_SESSION.md`).
+- **Not changed:** G-M1 stays open for the owner's review; C-13 stays blocked; I-24 to I-27 and I-30 to I-35 stay pending.
+
 ### C-12 — Public client, quickstart, README (closes M1)
 - **Scope:** `client.py` (`SentinelClient`, `register_tool`, `register_agent`, `evaluate_request`, `audit_events`); `__all__` (no proxy); `examples/quickstart.py`; README (status table, limitations from `decision_record.md` §2/§4.6/§6, decisions link).
 - **Dependencies:** C-11. **Blocked by:** D-17, D-24i. **Rev. 22: both Approved; C-12 may start.** Interpretations I-32 to I-35 (decision record, D-24) fill the remaining gaps. **G-M1 note:** the gate requires NFR-006 coverage, and C-12 evidence lists mypy and coverage output; neither tool is an approved dev dependency (D-22 remainder), so that part of the gate cannot be met until D-22 is decided.
@@ -364,7 +372,7 @@
   - **Gate G-M1 after this remediation:** C-01 … C-12 complete and independently reviewed ✅; NFR-006 met and enforced ✅ (subject to CI); README accurate ✅; threat model revisited ✅. **Still open:** the owner's review of M1, including I-24 to I-35, which the owner kept pending. **M1 is not closed.**
 
 #### Gate G-M1
-C-01 … C-12 complete; NFR-006 coverage met; README accurate; threat model revisited; owner review before M2. *(Rev. 24: all met except the owner review; see C-12 above.)*
+C-01 … C-12 complete; NFR-006 coverage met; README accurate; threat model revisited; owner review before M2. *(Rev. 24: all met except the owner review; see C-12 above.)* *(Rev. 25: the I-28 remediation of C-11 is added to the M1 evidence for that review; it does not close the gate.)*
 
 ### C-13 — Detection heuristics (M2)
 Recursive argument scanning, injection and sensitive-data rules, benign corpus, alert manager. **Blocked by:** D-24e, D-24h, the owner's review of the rule and severity table. **Acceptance:** table-driven tests; measured corpus counts; documented evasion test. **Invariants:** SEC-012, SEC-020.
@@ -475,3 +483,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 22 | D-17 and D-24i class name Approved; C-12 unblocked; G-M1 coverage/mypy dependency on D-22 noted |
 | 23 | C-12 implemented: `client.py`, public `__all__`, quickstart, README; 57 e2e tests; G-M1 open (coverage needs D-22; owner review) |
 | 24 | C-12 independent review and remediation: FR-023 quickstart, audit-row integrity, AT-30 guard test, pipeline fault-path tests, D-22 (coverage.py) and the NFR-006 gate in CI; G-M1 open only for the owner review (I-24 to I-35 pending) |
+| 25 | C-11 remediation (I-28 async cancellation lifecycle), authorized by the owner 2026-11-18 as G-M1 review evidence; G-M1 still open |

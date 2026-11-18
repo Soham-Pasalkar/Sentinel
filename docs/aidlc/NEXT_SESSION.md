@@ -1,8 +1,8 @@
 # Sentinel — Project Checkpoint and Resume Note
 
-Checkpoint of 2026-11-18, after the C-12 independent review and remediation (first written 2026-11-08, after C-12). This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
+Checkpoint of 2026-11-18, after the I-28 async-cancellation remediation of C-11 (before that: the C-12 independent review and remediation; first written 2026-11-08, after C-12). This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
 
-> **2026-11-18: development resumed by the owner for the C-12 remediation only.** That work is done (§2a). Gate **G-M1 is still not closed**: the owner's review of M1 is pending, and the owner chose to keep interpretations I-24 to I-35 pending. **C-13 must not begin until the owner closes G-M1.** No other implementation is authorized.
+> **2026-11-18: development resumed by the owner for the C-12 remediation only.** That work is done (§2a). **Later on 2026-11-18 the owner approved the I-28 remediation decisions and authorized their implementation as C-11 remediation evidence for the G-M1 review** (decision record §12, rev. 16). That work is done (§2b). Gate **G-M1 is still not closed**: the owner's review of M1 is pending. I-28 and I-29 are Approved in their new wording; **I-24 to I-27 and I-30 to I-35 remain pending**. **C-13 must not begin until the owner closes G-M1.** No other implementation is authorized.
 
 ## 1. Purpose and architecture
 
@@ -34,7 +34,7 @@ The pipeline (C-11) is the only audit writer. It commits every C4.3 event to SQL
 | C-08 policy engine | complete | `cc27883` |
 | C-09 audit store, logger, reconstruction | complete | `8379e47` |
 | C-10 execution proxy and `tool_call_id` guard | complete (narrow fix I-30 in C-11) | `708745d` |
-| C-11 pipeline (sync and internal async) | complete | `625970a` |
+| C-11 pipeline (sync and internal async) | complete; **I-28 async lifecycle remediated 2026-11-18** (§2b) | `625970a` + I-28 remediation commit |
 | C-12 public client, quickstart, README | implemented `53955f9`; **independently reviewed and remediated 2026-11-18** (§2a) | `53955f9` + remediation commit |
 
 Decision and documentation commits, in order: `bde7265`, `6c1ef3e`, `f64c8f6`, `fb4be1b`, `0794336`, `7efb7f2`, `deab308`, `65a4550`, `5d6ce77`, `eebfcc4`, `1292974` (the C-12 decisions).
@@ -60,6 +60,14 @@ Decision and documentation commits, in order: `bde7265`, `6c1ef3e`, `f64c8f6`, `
 
 Details: implementation plan rev. 24 (C-12).
 
+### 2b. I-28 async-cancellation remediation of C-11 (2026-11-18)
+
+**Defect (found in the owner's M1 review of I-24 to I-31, then five design-review rounds):** the async entry's clean-up after a cancelled caller ran as event-loop callbacks, which never ran when the loop was torn down. Claimed runs kept their guard entries in flight forever and requests had no REQUEST_COMPLETED; a completion awaited without a shield was lost on cancellation; a finalized pending task could deadlock on the store or guard lock.
+
+**Owner decisions (decision record §12, rev. 16):** K3 (C1.6 amendment: finalization writes nothing and takes no blocking lock), K4 (deferred guard retirement with `queue.SimpleQueue` and `ProxyRun.abandon_deferred()`), K1 and K1b (`INTERNAL_ERROR` mappings), K2 (the record before entry is written by a worker), D-BOUND, D-LOG, C1.6-I, and the new I-28 and I-29 texts.
+
+**Implemented** (`pipeline.py`, `proxy.py`; no dependency, no public API): executor jobs that return values and never raise; a per-request handoff lock deciding who closes a claimed run; the in-step check for finalization; deferred guard retirement. 149 new tests, including subprocess finalization tests and a seeded stress test; mutation checks in testing strategy §16. Details: implementation plan rev. 25.
+
 ## 3. Repository state (verified 2026-11-08; updated 2026-11-18)
 
 - **2026-11-18:** before the remediation, HEAD was `2c37035c6dab7b23ca5c5e0173ff2b18285c85ed` (this note's earlier version), local and remote matched, and the working tree was clean. The remediation commit sits on top; see §4 for its CI run.
@@ -71,6 +79,11 @@ Details: implementation plan rev. 24 (C-12).
   - No `main` branch exists; nothing has been merged; no release has been made.
 
 ## 4. Test evidence
+
+**I-28 remediation (2026-11-18), local (macOS, Python 3.11.14, project `.venv`):**
+- 1,207 passed, 1 xfailed (also with `RuntimeWarning` as an error); Ruff and format clean; `pip check` clean.
+- Branch coverage: `pipeline.py` 124/132 (93.94%), `proxy.py` 105/110 (95.45%), overall 640/660 (96.97%); NFR-006 check passed. The subprocess finalization tests are not measured by coverage.py.
+- **CI for the remediation commit:** to be recorded after the push. Python 3.12 and 3.13 are verified only by that run.
 
 **C-12 remediation (2026-11-18), local (macOS, Python 3.11.14, project `.venv`):**
 - 1,058 passed, 1 xfailed (also with `RuntimeWarning` as an error); Ruff and format clean; `pip check` clean.
@@ -129,11 +142,11 @@ Details: implementation plan rev. 24 (C-12).
 
 | G-M1 item (implementation plan) | State (2026-11-18) |
 |---|---|
-| C-01 … C-12 complete | ✅ C-12 independently reviewed; FR-023 fixed |
+| C-01 … C-12 complete | ✅ C-12 independently reviewed; FR-023 fixed. C-11 async lifecycle remediated (I-28, §2b), as evidence for the owner's review |
 | NFR-006 coverage met | ✅ locally and in CI run 44256518479 on `4e00c39` (all six test jobs); enforced in every test job |
 | README accurate | ✅ (updated in the remediation) |
-| Threat model revisited | ✅ (rev. 12) |
-| Owner review before M2 | ❌ **pending**, including I-24 to I-35, which the owner chose to keep pending |
+| Threat model revisited | ✅ (rev. 12; T-19 and T-21 updated in rev. 14) |
+| Owner review before M2 | ❌ **pending**, including I-24 to I-27 and I-30 to I-35 (I-28 and I-29 Approved 2026-11-18) |
 
 mypy is not a G-M1 item (NFR-005 is a SHOULD and not in the gate); it stays unapproved.
 
@@ -162,7 +175,8 @@ mypy is not a G-M1 item (NFR-005 is a SHOULD and not in the gate); it stays unap
 **Interpretations** (decision record, under D-24):
 - I-1 to I-23: confirmed by the owner.
 - **I-24 to I-35: the owner was asked on 2026-11-18 and chose to keep all of them pending** (decision record §12, rev. 15). A resumption handover claimed I-24 to I-31 were confirmed during the C-11 review; §12 has no such record, so they are pending.
-- **I-24 to I-31 (C-11): pending owner confirmation.**
+- **2026-11-18 (rev. 16): I-28 and I-29 replaced and Approved by the owner** with the I-28 remediation decisions.
+- **I-24 to I-27, I-30 and I-31 (C-11): pending owner confirmation.**
 - **I-32 to I-35 (C-12): pending owner confirmation:**
   - **I-32:** a non-mapping `raw` raises `TypeError`, unaudited;
   - **I-33:** the public export set;
@@ -173,7 +187,7 @@ mypy is not a G-M1 item (NFR-005 is a SHOULD and not in the gate); it stays unap
 
 *2026-11-08 list (items 1 and 3's coverage part done 2026-11-18):* independent review of C-12; D-22; close G-M1.
 
-1. **Owner review of M1:** confirm or amend I-24 to I-35, and record G-M1 as closed (or name what remains).
+1. **Owner review of M1:** confirm or amend I-24 to I-27 and I-30 to I-35, review the I-28 remediation evidence (§2b), and record G-M1 as closed (or name what remains).
 2. Only then: **C-13**, which also needs D-24e, D-24h and the owner's review of the rule and severity table.
 
 **C-13 must not begin until G-M1 is closed.**
@@ -207,7 +221,7 @@ mypy is not a G-M1 item (NFR-005 is a SHOULD and not in the gate); it stays unap
 - **Guards are process-local.** Single-use claims grow with executed requests. A `tool_call_id` repeat more than 300 s after the first call finished counts as new.
 - **No exactly-once external side effects.** If a later step fails, the side effect is not undone; the result says so.
 - **Credentials:** plain SHA-256 digests, which suit high-entropy tokens, not passwords. The constant-time comparison is best effort.
-- **Async:** a sync tool reached through the internal async entry runs in a thread that cannot be cancelled. The interruption record runs briefly on the event loop, as C1.6 prescribes.
+- **Async (I-28, rev. 16):** a sync tool reached through the internal async entry runs in a thread that cannot be cancelled; its job still audits it after the caller leaves. The C1.6 record after entry is the only SQLite write on the event loop; it is bounded in attempts, not in time (D-BOUND), and its failure warning may block on application logging handlers (D-LOG). A finalized request writes nothing and reads as unknown; a task never finalized while its loop is abandoned keeps its run claimed and its guard entry in flight.
 
 ## 10. Known documentation discrepancies
 

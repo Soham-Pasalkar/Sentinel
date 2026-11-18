@@ -27,6 +27,16 @@ diagnostics (D-29 fields only: exception type, module, function, line,
 stage; never message text or file paths). A ``BaseException`` after
 ``entered`` sets ``run.state == "interrupted"`` and propagates unchanged.
 
+Coroutine finalization (K3, K4; owner 2026-11-18): when ``execute_async``'s
+coroutine is closed outside its own Task's step (garbage collection of a
+pending task, or an explicit ``close()``), the handler may run on any thread
+at any point, possibly while that thread holds a Sentinel lock. It then takes
+no blocking lock: the run is marked as usual (``not_started`` /
+``interrupted``) and its guard entry is queued with
+``ToolCallGuard.retire_deferred``, which the guard applies at its next
+``claim`` or ``len``. ``ProxyRun.abandon_deferred`` is the matching
+non-blocking abandon for a claimed run whose owner is being finalized.
+
 Not done here: validation, identity, detection, policy, audit and the mapping
 to ``PipelineResult`` (C-11). Re-resolution narrows but does not close the
 window before the tool's own ``open`` (C2). Both guards are process-local.
@@ -38,6 +48,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import math
+import queue
 import threading
 import time
 from collections.abc import Callable
@@ -92,6 +103,36 @@ def _finite_real(value: object) -> bool:
     return type(value) in (int, float) and math.isfinite(value)
 
 
+#: The event loop and Task a coroutine runs in, captured when it starts.
+_Owner = tuple[asyncio.AbstractEventLoop, "asyncio.Task[Any] | None"]
+
+
+def _task_owner() -> _Owner:
+    """The running loop and current Task; call at the top of a coroutine."""
+    loop = asyncio.get_running_loop()
+    return loop, asyncio.current_task(loop)
+
+
+def _outside_own_step(owner: _Owner) -> bool:
+    """Whether code runs outside its own Task's step (K3; owner 2026-11-18).
+
+    True for coroutine finalization and an explicit ``close()``: the
+    coroutine is then not being stepped by the Task it started in. An
+    exception raised by tool or Sentinel code inside the step (including a
+    ``GeneratorExit``) gives ``False``. Lock-free (a dict lookup), so it is
+    safe on any thread. If the Task is unknown, or the check itself fails
+    (for example during interpreter teardown), it answers ``True``: the
+    caller then does no blocking work, which fails safe.
+    """
+    loop, task = owner
+    if task is None:
+        return True
+    try:
+        return asyncio.current_task(loop) is not task
+    except Exception:
+        return True
+
+
 # ------------------------------------------------------------------ guard
 
 
@@ -138,6 +179,10 @@ class ToolCallGuard:
         self._last = first
         self._entries: dict[tuple[str, str, str], float | None] = {}
         self._lock = threading.Lock()
+        # Retirements queued from finalizers (K4). ``SimpleQueue.put`` is
+        # documented as reentrant and safe in ``__del__``: it never takes a
+        # lock that a finalizer's thread might already hold.
+        self._deferred: queue.SimpleQueue[tuple[str, str, str]] = queue.SimpleQueue()
 
     @property
     def ttl_seconds(self) -> float:
@@ -150,8 +195,14 @@ class ToolCallGuard:
         return self._capacity
 
     def __len__(self) -> int:
-        """Number of entries currently held (in flight or unexpired)."""
+        """Number of entries currently held (in flight or unexpired).
+
+        Applies queued deferred retirements first.
+        """
         with self._lock:
+            now = self._valid_now()
+            if now is not None:
+                self._drain(now)
             return len(self._entries)
 
     def _now(self) -> float:
@@ -173,6 +224,7 @@ class ToolCallGuard:
             if now < self._last:
                 raise RuntimeError("guard clock moved backwards")
             self._last = now
+            self._drain(now)
             expired = [
                 k
                 for k, expiry in self._entries.items()
@@ -196,14 +248,43 @@ class ToolCallGuard:
         with self._lock:
             if key not in self._entries or self._entries[key] is not None:
                 return
+            now = self._valid_now()
+            if now is not None:
+                self._entries[key] = now + self._ttl
+
+    def retire_deferred(self, key: tuple[str, str, str]) -> None:
+        """Queue ``key``'s retirement without taking any lock (K4).
+
+        For finalizers, which may run on a thread that already holds this
+        guard's lock. The entry stays in flight until the next ``claim`` or
+        ``len`` applies the queue under the lock; its TTL starts then, which
+        is never earlier than the terminal state (D-31). Never raises.
+        """
+        self._deferred.put(key)
+
+    def _valid_now(self) -> float | None:
+        """A valid, non-decreasing clock reading, or ``None`` (I-16).
+
+        Call under the lock. Advances the last reading.
+        """
+        try:
+            now = self._now()
+        except RuntimeError:
+            return None
+        if now < self._last:
+            return None
+        self._last = now
+        return now
+
+    def _drain(self, now: float) -> None:
+        """Apply queued deferred retirements at ``now``. Call under the lock."""
+        while True:
             try:
-                now = self._now()
-            except RuntimeError:
+                key = self._deferred.get_nowait()
+            except queue.Empty:
                 return
-            if now < self._last:
-                return
-            self._last = now
-            self._entries[key] = now + self._ttl
+            if self._entries.get(key, 0.0) is None:
+                self._entries[key] = now + self._ttl
 
 
 # --------------------------------------------------------------- outcomes
@@ -277,7 +358,8 @@ class ProxyRun:
     ``state``: ``refused`` (see ``outcome``), ``claimed``, ``executing``
     (re-resolution in progress), ``not_started``, ``entered``, ``completed``,
     ``failed`` or ``interrupted``. A claimed run must end in ``execute``,
-    ``execute_async`` or ``abandon``, so its guard entry is retired.
+    ``execute_async``, ``abandon`` or ``abandon_deferred``, so its guard
+    entry is retired (at once, or at the guard's next operation).
     """
 
     def __init__(
@@ -327,6 +409,29 @@ class ProxyRun:
             self.state = "not_started"
         self._retire()
 
+    def abandon_deferred(self) -> bool:
+        """``abandon`` for a finalizer: never blocks (K4; owner 2026-11-18).
+
+        Used when the coroutine that owns a claimed run is closed outside its
+        Task's step, possibly on a thread that holds a Sentinel lock. Tries
+        the run's lock without blocking; if the run is still ``claimed`` it
+        becomes ``not_started`` and its guard entry is queued for retirement
+        (``ToolCallGuard.retire_deferred``). Returns whether it abandoned the
+        run. If the lock is busy or the run is not claimed, nothing changes:
+        a still-claimed run then keeps its guard entry in flight, which fails
+        closed.
+        """
+        if not self._lock.acquire(blocking=False):
+            return False
+        try:
+            if self.state != "claimed":
+                return False
+            self.state = "not_started"
+        finally:
+            self._lock.release()
+        self._retire_deferred()
+        return True
+
     def _interrupted(self) -> None:
         """Record a ``BaseException``: entered → interrupted; else not started."""
         if self.state == "entered":
@@ -342,6 +447,10 @@ class ProxyRun:
     def _retire(self) -> None:
         if self._guard is not None and self._guard_key is not None:
             self._guard.retire(self._guard_key)
+
+    def _retire_deferred(self) -> None:
+        if self._guard is not None and self._guard_key is not None:
+            self._guard.retire_deferred(self._guard_key)
 
     def _paths_unchanged(self, tool: RegisteredTool, action: AuthorizedAction) -> bool:
         """Re-resolve every registered path argument (C2.7)."""
@@ -422,8 +531,15 @@ class ProxyRun:
             self._retire()
 
     async def execute_async(self) -> ProxyOutcome:
-        """Run an async tool, awaited on the caller's event loop."""
+        """Run an async tool, awaited on the caller's event loop.
+
+        If the coroutine is finalized (closed outside its Task's step), the
+        guard entry is queued for retirement instead of retired under the
+        guard's lock (K4), because the finalizer's thread may hold that lock.
+        """
+        owner = _task_owner()
         tool, action = self._start("async")
+        finalizing = False
         try:
             # Filesystem re-resolution runs off the event loop (D-20, C3.5
             # rule 6; I-30), immediately before the tool is entered.
@@ -439,9 +555,13 @@ class ProxyRun:
             return self._after_return(result)
         except BaseException:
             self._interrupted()
+            finalizing = _outside_own_step(owner)
             raise
         finally:
-            self._retire()
+            if finalizing:
+                self._retire_deferred()
+            else:
+                self._retire()
 
 
 # ------------------------------------------------------------------ proxy
