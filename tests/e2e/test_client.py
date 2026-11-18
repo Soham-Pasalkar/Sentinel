@@ -223,6 +223,16 @@ def test_public_signatures_are_stable():
     assert (params["request_id"].default, params["limit"].default) == (None, 100)
 
 
+def test_required_registration_keywords_show_as_required():
+    # The placeholder default is readable in help() and signatures, and
+    # omitting the keyword is still a RegistrationError (C-05), not TypeError.
+    params = inspect.signature(SentinelClient.register_tool).parameters
+    for name in ("arg_schema", "destructive"):
+        assert params[name].kind is inspect.Parameter.KEYWORD_ONLY
+        assert repr(params[name].default) == "<required>"
+    assert "object at 0x" not in str(inspect.signature(SentinelClient.register_tool))
+
+
 def test_no_public_async_entry_or_internal_access():
     # AT-34: no async method on SentinelClient (D-30).
     public = {n for n in dir(SentinelClient) if not n.startswith("_")}
@@ -675,6 +685,111 @@ def test_unknown_stored_value_is_an_integrity_error(env, tmp_path):
         )
     with pytest.raises(AuditIntegrityError):
         env.client.audit_events(limit=1000)
+
+
+TAMPER_CANARY = "CANARY-tamper-5e02"
+VALID_TAMPERED_ROW = {
+    "event_id": "tampered",
+    "request_id": "r-tampered",
+    "event_type": "REQUEST_RECEIVED",
+    "occurred_at": "2026-01-01T00:00:00+00:00",
+    "schema_version": 1,
+}
+
+
+def _tamper(env, **overrides):
+    """Insert a row through a separate SQLite connection (outside the API)."""
+    row = {**VALID_TAMPERED_ROW, **overrides}
+    names = ", ".join(row)
+    marks = ", ".join("?" for _ in row)
+    with sqlite3.connect(env.db) as conn:
+        conn.execute(
+            f"INSERT INTO audit_events ({names}) VALUES ({marks})",  # noqa: S608
+            tuple(row.values()),
+        )
+
+
+def test_a_well_formed_row_written_outside_the_api_still_reads(env):
+    # The checks refuse only values Sentinel never writes; they do not depend
+    # on how a row got there.
+    _tamper(env)
+    (event,) = env.client.audit_events("r-tampered")
+    assert event.occurred_at.utcoffset().total_seconds() == 0
+    assert (event.seq, event.event_type) == (1, "REQUEST_RECEIVED")
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        pytest.param({"occurred_at": "2026-01-01T00:00:00"}, id="naive-timestamp"),
+        pytest.param(
+            {"occurred_at": "2026-01-01T00:00:00+05:00"}, id="non-utc-timestamp"
+        ),
+        pytest.param({"occurred_at": TAMPER_CANARY}, id="malformed-timestamp"),
+        pytest.param({"occurred_at": ""}, id="empty-timestamp"),
+        pytest.param({"occurred_at": b"\x00\x01"}, id="blob-timestamp"),
+        pytest.param({"occurred_at": 1767225600}, id="numeric-timestamp"),
+        pytest.param({"event_type": TAMPER_CANARY}, id="unknown-event-type"),
+        pytest.param({"event_type": b"DECISION"}, id="blob-event-type"),
+        pytest.param(
+            {"event_type": "REQUEST_COMPLETED", "execution": TAMPER_CANARY},
+            id="unknown-execution",
+        ),
+        pytest.param(
+            {"event_type": "DECISION", "decision": "ALLOW"}, id="wrong-case-decision"
+        ),
+        pytest.param({"decision": b"allow"}, id="blob-decision"),
+        pytest.param({"detail": b"{}"}, id="blob-detail"),
+        pytest.param({"agent_id": b"agent"}, id="blob-agent-id"),
+        pytest.param({"request_id": b"r-tampered"}, id="blob-request-id"),
+        pytest.param({"schema_version": 2}, id="unsupported-schema-version"),
+        # SQLite's INTEGER affinity would turn "1" into 1 (a valid row), so
+        # use values it keeps as text and as a real number.
+        pytest.param({"schema_version": "one"}, id="text-schema-version"),
+        pytest.param({"schema_version": 2.5}, id="real-schema-version"),
+    ],
+)
+def test_tampered_stored_values_are_integrity_errors(env, overrides):
+    _tamper(env, **overrides)
+    with pytest.raises(AuditIntegrityError) as info:
+        env.client.audit_events()
+    message = str(info.value)
+    assert message == "audit row has an invalid value"
+    assert TAMPER_CANARY not in message
+    assert info.value.__cause__ is None
+
+
+@pytest.mark.parametrize(
+    "seq", [0, -1, True, None, 1.0, "1"], ids=lambda v: f"seq={v!r}"
+)
+def test_invalid_sequence_values_are_integrity_errors(env, monkeypatch, seq):
+    # SQLite's INTEGER PRIMARY KEY cannot hold these, so the store's read is
+    # replaced to return a row as a damaged or substituted store might.
+    from sentinel.store import AuditRow
+
+    row = AuditRow(
+        seq=seq,
+        **{k: v for k, v in VALID_TAMPERED_ROW.items()},
+        agent_id=None,
+        session_id=None,
+        tool=None,
+        decision=None,
+        reason=None,
+        policy_version=None,
+        action_digest=None,
+        execution=None,
+        detail=None,
+    )
+    store = env.client._pipeline.audit.store
+    monkeypatch.setattr(store, "read", lambda *a, **k: (row,))
+    with pytest.raises(AuditIntegrityError):
+        env.client.audit_events()
+
+
+def test_integrity_errors_are_sentinel_errors(env):
+    _tamper(env, occurred_at="2026-01-01T00:00:00")
+    with pytest.raises(sentinel.SentinelError):
+        env.client.audit_events()
 
 
 # ============================================================ lifecycle

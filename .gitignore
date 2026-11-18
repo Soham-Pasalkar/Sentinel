@@ -17,6 +17,8 @@ spikes/**/.venv/
 .ruff_cache/
 .mypy_cache/
 .coverage
+.coverage.*
+coverage.json
 htmlcov/
 
 # Secrets and local configuration

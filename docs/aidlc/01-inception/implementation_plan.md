@@ -325,9 +325,46 @@
   - Evidence: local macOS, Python 3.11.14: 991 passed, 1 xfailed (also with `RuntimeWarning` as an error); Ruff and format clean; `pip check` clean; the quickstart prints the expected three lines; a clean process sees exactly the listed `__all__`.
   - **Not available:** mypy and coverage output (NFR-005, NFR-006): neither tool is an approved dev dependency (D-22 remainder).
   - **Gate G-M1:** C-01 … C-12 complete ✅; README accurate ✅; threat model revisited ✅ (rev. 12). Still open: NFR-006 coverage ❌ (needs pytest-cov, D-22); owner review before M2 ❌ (pending). **M1 is not closed.**
+- **Rev. 24: independent review of C-12 (2026-11-18) and remediation.** Development resumed by the owner for this scope only; D-22 Approved for coverage.py only; NFR-006 thresholds Approved per file; I-24 to I-35 kept pending (decision record §12, rev. 15).
+  - **Review findings:**
+    - FR-023 (MUST, M1) was **not met**: the quickstart showed allow and an ungranted-tool deny only;
+    - the C-12 checkpoint cited the AT-06 test for AT-30's guard part, so that part had no test;
+    - `pyproject.toml` still described the package as having "no security functionality";
+    - `audit_events` could return a naive timestamp, or raise a bare `TypeError`, for a row altered outside Sentinel's API;
+    - required registration keywords showed an `<object object at …>` default.
+
+    No defect was found in the security path (C-01 … C-11).
+  - **Changes:**
+    - `examples/quickstart.py`: all five FR-023 scenarios (allow; path traversal; ungranted tool; unknown agent; approval required) in a temporary workspace, with each request's audit rows and the tools' own call counts;
+    - `client.py`: `_event` validates stored rows strictly (types, event type, decision, execution, schema version, `seq`, timezone-aware UTC timestamp) and raises `AuditIntegrityError` with fixed text; the docstring lists it;
+    - `registry.py`: the required-keyword placeholder shows as `<required>` (omission still raises `RegistrationError`);
+    - `pyproject.toml`: description, `Development Status :: 2 - Pre-Alpha`, coverage dev dependency and configuration; `constraints-dev.txt` pins `coverage==7.17.3`;
+    - `scripts/check_coverage.py` and CI: the NFR-006 gate in every test job;
+    - documentation reconciled (testing §6, §8, §12, §15; requirements rev. 22; decision record rev. 15; README; `NEXT_SESSION.md`).
+  - **Tests (+67):**
+    - `e2e/test_quickstart.py`: 3 tests (was 2);
+    - `e2e/test_client.py`: +26 (integrity cases, readable defaults);
+    - `unit/test_proxy.py`: +1 (AT-30 guard part);
+    - `security/test_pipeline_fault_edges.py`: 8 new fault paths that lifted `pipeline.py` from 85.4% to 92.7% branch coverage, with no exclusions;
+    - `unit/test_check_coverage.py`: 31 tests of the gate.
+  - **Mutation checks:** every deliberately broken version was caught (guard key without `tool_call_id`; each `_event` check removed; abandon removed after an internal error; unrecordable values stored with `repr`; placeholder `repr`; widened quickstart grant; approval scenario ungranted; rounding or missing-module tolerance in the gate). The gate also fails on real data (`pipeline.py` 85.37%) when the new fault-path tests are left out.
+  - **Evidence (local macOS, Python 3.11.14):** 1,058 passed, 1 xfailed (also with `RuntimeWarning` as an error); Ruff and format clean; `pip check` clean. Branch coverage:
+
+    | Module | Branch coverage |
+    |---|---|
+    | `policy.py` | 34/34 (100%) |
+    | `proxy.py` | 89/94 (94.68%) |
+    | `pipeline.py` | 76/82 (92.68%) |
+    | `paths.py` | 28/28 (100%) |
+    | `audit.py` | 121/126 (96.03%) |
+    | `store.py` | 53/54 (98.15%) |
+    | **Overall** | **576/594 (96.97%)** |
+
+    CI evidence for the pushed commit is in `NEXT_SESSION.md`.
+  - **Gate G-M1 after this remediation:** C-01 … C-12 complete and independently reviewed ✅; NFR-006 met and enforced ✅ (subject to CI); README accurate ✅; threat model revisited ✅. **Still open:** the owner's review of M1, including I-24 to I-35, which the owner kept pending. **M1 is not closed.**
 
 #### Gate G-M1
-C-01 … C-12 complete; NFR-006 coverage met; README accurate; threat model revisited; owner review before M2.
+C-01 … C-12 complete; NFR-006 coverage met; README accurate; threat model revisited; owner review before M2. *(Rev. 24: all met except the owner review; see C-12 above.)*
 
 ### C-13 — Detection heuristics (M2)
 Recursive argument scanning, injection and sensitive-data rules, benign corpus, alert manager. **Blocked by:** D-24e, D-24h, the owner's review of the rule and severity table. **Acceptance:** table-driven tests; measured corpus counts; documented evasion test. **Invariants:** SEC-012, SEC-020.
@@ -405,7 +442,7 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 
 1. Scope implemented; no placeholder modules; nothing outside scope.
 2. The listed tests exist and fail without the code under test (where meaningful).
-3. `pytest`, `ruff check` and `ruff format --check` are clean, plus `mypy src` once D-22 approves mypy, with **actual output** in the increment report.
+3. `pytest`, `ruff check` and `ruff format --check` are clean, plus `mypy src` once D-22 approves mypy, with **actual output** in the increment report. **Rev. 24:** the NFR-006 branch-coverage gate (`coverage run -m pytest`, `scripts/check_coverage.py`) passes.
 4. README status updated in the same commit.
 5. Every decision the increment relies on is **Approved** in `decision_record.md`. New decisions or deviations are recorded there first.
 6. One local conventional commit (D-13). No push unless the owner asks.
@@ -437,3 +474,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 21 | C-11 implemented: `pipeline.py`, `config.py`, `detector.py`, C-10 fix I-30, 116 tests |
 | 22 | D-17 and D-24i class name Approved; C-12 unblocked; G-M1 coverage/mypy dependency on D-22 noted |
 | 23 | C-12 implemented: `client.py`, public `__all__`, quickstart, README; 57 e2e tests; G-M1 open (coverage needs D-22; owner review) |
+| 24 | C-12 independent review and remediation: FR-023 quickstart, audit-row integrity, AT-30 guard test, pipeline fault-path tests, D-22 (coverage.py) and the NFR-006 gate in CI; G-M1 open only for the owner review (I-24 to I-35 pending) |

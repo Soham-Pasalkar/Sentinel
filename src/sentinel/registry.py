@@ -43,7 +43,22 @@ from sentinel.paths import require_path_support
 
 __all__ = ["RegisteredTool", "ToolRegistry"]
 
-_MISSING: Any = object()
+
+class _Required:
+    """Placeholder default for required keywords (``arg_schema``, ``destructive``).
+
+    A missing value must raise ``RegistrationError`` (C-05, D-06, D-08), not
+    Python's ``TypeError``, so these keywords keep a default. Compared only by
+    identity; its ``repr`` keeps ``help()`` and signatures readable.
+    """
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "<required>"
+
+
+_MISSING: Any = _Required()
 
 
 @dataclass(frozen=True, slots=True)

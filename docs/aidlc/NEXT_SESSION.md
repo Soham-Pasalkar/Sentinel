@@ -1,9 +1,8 @@
 # Sentinel — Project Checkpoint and Resume Note
 
-Checkpoint of 2026-11-08, after C-12. This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
+Checkpoint of 2026-11-18, after the C-12 independent review and remediation (first written 2026-11-08, after C-12). This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
 
-> **Development is PAUSED by the owner. No implementation work is authorized during this pause.**
-> When work resumes, the exact next task is the **independent review of C-12 and the closure of gate G-M1**. **C-13 must not begin until M1 has been reviewed and its gate is satisfied.**
+> **2026-11-18: development resumed by the owner for the C-12 remediation only.** That work is done (§2a). Gate **G-M1 is still not closed**: the owner's review of M1 is pending, and the owner chose to keep interpretations I-24 to I-35 pending. **C-13 must not begin until the owner closes G-M1.** No other implementation is authorized.
 
 ## 1. Purpose and architecture
 
@@ -36,11 +35,34 @@ The pipeline (C-11) is the only audit writer. It commits every C4.3 event to SQL
 | C-09 audit store, logger, reconstruction | complete | `8379e47` |
 | C-10 execution proxy and `tool_call_id` guard | complete (narrow fix I-30 in C-11) | `708745d` |
 | C-11 pipeline (sync and internal async) | complete | `625970a` |
-| C-12 public client, quickstart, README | **implemented; independent review pending** | `53955f9` |
+| C-12 public client, quickstart, README | implemented `53955f9`; **independently reviewed and remediated 2026-11-18** (§2a) | `53955f9` + remediation commit |
 
 Decision and documentation commits, in order: `bde7265`, `6c1ef3e`, `f64c8f6`, `fb4be1b`, `0794336`, `7efb7f2`, `deab308`, `65a4550`, `5d6ce77`, `eebfcc4`, `1292974` (the C-12 decisions).
 
-## 3. Repository state (verified 2026-11-08)
+### 2a. C-12 independent review and remediation (2026-11-18)
+
+**Findings:**
+- FR-023 was not met: the quickstart showed only allow and an ungranted-tool deny.
+- AT-30's guard part had no test: the checkpoint cited `test_guard_key_includes_agent_and_session`, which is the AT-06 test.
+- `pyproject.toml` still described the package as having "no security functionality".
+- `audit_events` could return a naive timestamp, or raise a bare `TypeError`, for a row altered outside Sentinel's API.
+- Required registration keywords showed an `<object object at …>` default.
+- No defect was found in the C-01 … C-11 security path.
+
+**Fixed in one commit:**
+- the FR-023 quickstart;
+- strict validation of audit rows on read (`AuditIntegrityError`);
+- the AT-30 guard test;
+- eight pipeline fault-path tests;
+- the package metadata and the readable placeholder;
+- D-22 (coverage.py) with the NFR-006 gate in CI;
+- reconciled documentation.
+
+Details: implementation plan rev. 24 (C-12).
+
+## 3. Repository state (verified 2026-11-08; updated 2026-11-18)
+
+- **2026-11-18:** before the remediation, HEAD was `2c37035c6dab7b23ca5c5e0173ff2b18285c85ed` (this note's earlier version), local and remote matched, and the working tree was clean. The remediation commit sits on top; see §4 for its CI run.
 
 - **Branch:** `c01-project-scaffold`. **HEAD:** `53955f9a47b3e6425fe55c2edb908e0aa3e1bfd4` (C-12), with the C-12 decision commit `1292974` directly below it. This checkpoint note is committed on top as documentation only.
 - **Remote:** `https://github.com/Soham-Pasalkar/Sentinel`, branch `c01-project-scaffold`; local and remote matched at `53955f9` before this checkpoint commit.
@@ -49,6 +71,24 @@ Decision and documentation commits, in order: `bde7265`, `6c1ef3e`, `f64c8f6`, `
   - No `main` branch exists; nothing has been merged; no release has been made.
 
 ## 4. Test evidence
+
+**C-12 remediation (2026-11-18), local (macOS, Python 3.11.14, project `.venv`):**
+- 1,058 passed, 1 xfailed (also with `RuntimeWarning` as an error); Ruff and format clean; `pip check` clean.
+- Branch coverage (coverage.py 7.17.3):
+
+  | Module | Branch coverage |
+  |---|---|
+  | `policy.py` | 34/34 (100%) |
+  | `proxy.py` | 89/94 (94.68%) |
+  | `pipeline.py` | 76/82 (92.68%) |
+  | `paths.py` | 28/28 (100%) |
+  | `audit.py` | 121/126 (96.03%) |
+  | `store.py` | 53/54 (98.15%) |
+  | **Overall** | **576/594 (96.97%)** |
+
+- **CI for the remediation commit:** recorded below once its run finishes.
+
+**Checkpoint commit `2c37035`:** CI run [42477135779](https://github.com/Soham-Pasalkar/Sentinel/actions/runs/42477135779) tested exactly that SHA. Ruff passed, and all six pytest jobs passed with 991 passed, 1 xfailed each. *(The 2026-11-08 text below said the checkpoint push did not wait for CI; a run did happen.)*
 
 **C-12 CI run:** [42475826810](https://github.com/Soham-Pasalkar/Sentinel/actions/runs/42475826810), on exactly `53955f9a47b3e6425fe55c2edb908e0aa3e1bfd4` (push event). Every job succeeded:
 - Ruff: lint passed; format check passed (42 files).
@@ -80,19 +120,19 @@ Decision and documentation commits, in order: `bde7265`, `6c1ef3e`, `f64c8f6`, `
 
 **Mutation checks** (deliberately broken copies; details in the implementation plan, per increment): every behaviour change was caught after the gaps found were closed. The remaining survivors are behaviour-equivalent.
 
-**Not available:** mypy (NFR-005) and coverage (NFR-006) output. Neither tool is an approved development dependency (D-22 remainder).
+*2026-11-08:* "Not available: mypy (NFR-005) and coverage (NFR-006) output." **2026-11-18:** coverage is approved (D-22, coverage.py only) and measured; mypy is still not approved (NFR-005).
 
 ## 5. Gate G-M1: NOT CLOSED
 
-| G-M1 item (implementation plan) | State |
+| G-M1 item (implementation plan) | State (2026-11-18) |
 |---|---|
-| C-01 … C-12 complete | implemented ✅ (C-12 independent review pending) |
-| NFR-006 coverage met | ❌ **cannot be measured**: pytest-cov is not approved (D-22) |
-| README accurate | ✅ (rewritten in C-12) |
+| C-01 … C-12 complete | ✅ C-12 independently reviewed; FR-023 fixed |
+| NFR-006 coverage met | ✅ locally (§4) and enforced in every CI test job; see §4 for CI |
+| README accurate | ✅ (updated in the remediation) |
 | Threat model revisited | ✅ (rev. 12) |
-| Owner review before M2 | ❌ pending |
+| Owner review before M2 | ❌ **pending**, including I-24 to I-35, which the owner chose to keep pending |
 
-The C-12 evidence list in the plan also names mypy and coverage output, which have the same dependency on D-22.
+mypy is not a G-M1 item (NFR-005 is a SHOULD and not in the gate); it stays unapproved.
 
 ## 6. Decisions
 
@@ -103,13 +143,13 @@ The C-12 evidence list in the plan also names mypy and coverage output, which ha
 - D-19 failure rule; Q-03c; the operational-refusal table; FR-022;
 - NFR-002 (Pydantic only; no SQLAlchemy).
 
-**Partly approved:** D-22 (pytest, Ruff, Hatchling only).
+**Partly approved:** D-22 (pytest, Ruff, Hatchling; **coverage.py added 2026-11-18**; mypy, pytest-cov and Hypothesis not approved). **Approved 2026-11-18:** the NFR-006 thresholds (each guarded file ≥ 90% branch coverage; overall ≥ 85%).
 
 **Open, with what each blocks:**
 
 | Decision | Blocks |
 |---|---|
-| **D-22 remainder** (mypy, pytest-cov, Hypothesis) | **G-M1** (NFR-006 coverage); NFR-005; property tests |
+| D-22 remainder (mypy, Hypothesis; pytest-cov not needed) | NFR-005; property tests (not G-M1) |
 | D-24e (detector interface, recursive scan, detector failure), D-24h (advisory wording), owner review of the rule and severity table | C-13 |
 | D-19 M3 mode (recorded: default `redact`; unsupported types withheld in `enforce`) | C-14 |
 | D-20 rate-limit part; cross-agent constraint mechanism | C-15 |
@@ -118,6 +158,7 @@ The C-12 evidence list in the plan also names mypy and coverage output, which ha
 
 **Interpretations** (decision record, under D-24):
 - I-1 to I-23: confirmed by the owner.
+- **I-24 to I-35: the owner was asked on 2026-11-18 and chose to keep all of them pending** (decision record §12, rev. 15). A resumption handover claimed I-24 to I-31 were confirmed during the C-11 review; §12 has no such record, so they are pending.
 - **I-24 to I-31 (C-11): pending owner confirmation.**
 - **I-32 to I-35 (C-12): pending owner confirmation:**
   - **I-32:** a non-mapping `raw` raises `TypeError`, unaudited;
@@ -127,11 +168,12 @@ The C-12 evidence list in the plan also names mypy and coverage output, which ha
 
 ## 7. Next task when work resumes
 
-1. **Independent review of C-12** (commit `53955f9`, with `1292974`): the public API, `sentinel.__all__`, the audit read bounds, the quickstart and the README.
-2. **Owner decisions:** D-22 (at least pytest-cov, for NFR-006); confirmation or amendment of I-24 to I-35.
-3. **Close G-M1:** measure coverage once D-22 allows it, and complete the owner review of M1.
+*2026-11-08 list (items 1 and 3's coverage part done 2026-11-18):* independent review of C-12; D-22; close G-M1.
 
-**C-13 must not begin until M1 has been reviewed and G-M1 is satisfied.** No implementation work is authorized during the pause.
+1. **Owner review of M1:** confirm or amend I-24 to I-35, and record G-M1 as closed (or name what remains).
+2. Only then: **C-13**, which also needs D-24e, D-24h and the owner's review of the rule and severity table.
+
+**C-13 must not begin until G-M1 is closed.**
 
 ## 8. Security constraints not to forget
 
@@ -164,7 +206,16 @@ The C-12 evidence list in the plan also names mypy and coverage output, which ha
 - **Credentials:** plain SHA-256 digests, which suit high-entropy tokens, not passwords. The constant-time comparison is best effort.
 - **Async:** a sync tool reached through the internal async entry runs in a thread that cannot be cancelled. The interruption record runs briefly on the event loop, as C1.6 prescribes.
 
-## 10. Known documentation discrepancies (for the review; not fixed during the pause)
+## 10. Known documentation discrepancies
+
+**Resolved 2026-11-18** (testing strategy rev. 15):
+- AT-24 is marked from the inspected test (pipeline part PASS; framework part C-16).
+- AT-30's guard part now has its own test (`test_at30_distinct_call_ids_in_one_session_execute_independently`).
+- AT-34's C-12 part is PASS (adapter part C-16).
+- The stale "Remote CI … through C-04" wording is corrected.
+- The plan's mypy item does not apply (mypy not approved; not a gate item).
+
+*2026-11-08 text, kept as history:*
 
 - `testing_strategy.md` §15 still marks **AT-24** (pipeline part) and **AT-30** (guard part) as `PROD-TODO`. They are covered by `test_many_concurrent_requests_stay_consistent` (C-11) and `test_guard_key_includes_agent_and_session` (C-10). The other 20 `PROD-TODO` rows belong to C-16 or C-18, which is correct.
 - The implementation plan's C-12 evidence list names mypy and coverage output, which cannot be produced until D-22 is decided (see §5).
@@ -173,12 +224,13 @@ The C-12 evidence list in the plan also names mypy and coverage output, which ha
 
 ```bash
 cd /path/to/Sentinel
-git status --short && git log --oneline -3     # expect this checkpoint commit on top of 53955f9
+git status --short && git log --oneline -3     # expect the remediation commits on top of 2c37035
 git fetch origin && git status -sb              # local and remote should match
 source .venv/bin/activate                       # recreate only with owner approval:
 # python3.11 -m venv .venv && python -m pip install -e ".[dev]" -c constraints-dev.txt
-pytest                                          # expect 991 passed, 1 xfailed
-python examples/quickstart.py                   # three lines: allow, deny, audit trail
+pytest                                          # expect 1,058 passed, 1 xfailed
+coverage run -m pytest && coverage json -q && python scripts/check_coverage.py coverage.json
+python examples/quickstart.py                   # five scenarios with audit rows; calls: add=1, others 0
 ruff check . && ruff format --check .
 python -m pip check
 gh run list --repo Soham-Pasalkar/Sentinel --branch c01-project-scaffold   # CI for the branch

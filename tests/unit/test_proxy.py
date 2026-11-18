@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict
 
 import sentinel
 from sentinel import proxy as proxy_module
-from sentinel.action import AuthorizedAction
+from sentinel.action import AuthorizedAction, action_digest
 from sentinel.exceptions import ConfigurationError
 from sentinel.gateway import validate_request
 from sentinel.identity import IdentityStore
@@ -592,6 +592,43 @@ def test_guard_key_includes_agent_and_session(env):
     executed(env.run("count", tool_call_id="call-1", agent_id="agent-2").execute())
     assert len(env.calls) == 3
     assert len(env.proxy.guard) == 3
+
+
+def test_at30_distinct_call_ids_in_one_session_execute_independently(env):
+    # AT-30 guard part (D-07, D-31): two requests from the same agent and
+    # session that differ only in tool_call_id have the same action content,
+    # tool_call_id is not part of either digest, and the guard keeps them as
+    # two independent keys: both execute once, and each repeat is refused.
+    request_1, decision_1, context_1 = env.inputs("count", tool_call_id="call-1")
+    request_2, decision_2, context_2 = env.inputs("count", tool_call_id="call-2")
+    action_1, action_2 = decision_1.action, decision_2.action
+    assert (action_1.agent_id, action_1.tool, action_1.arguments) == (
+        action_2.agent_id,
+        action_2.tool,
+        action_2.arguments,
+    )
+    for request, action in ((request_1, action_1), (request_2, action_2)):
+        assert action.digest == action_digest(
+            request.request_id, action.agent_id, action.tool, action.arguments
+        )
+    # Same content under one request id gives one digest: tool_call_id is
+    # not an input, so only the request id separates these two actions.
+    assert action_digest(
+        "same", action_1.agent_id, action_1.tool, action_1.arguments
+    ) == action_digest("same", action_2.agent_id, action_2.tool, action_2.arguments)
+
+    executed(env.proxy.claim(request_1, decision_1, context_1).execute(), 2)
+    executed(env.proxy.claim(request_2, decision_2, context_2).execute(), 2)
+    assert env.calls == [("count", {"n": 1}), ("count", {"n": 1})]
+    assert set(env.proxy.guard._entries) == {
+        ("agent-1", "sess-1", "call-1"),
+        ("agent-1", "sess-1", "call-2"),
+    }
+
+    refused(env.run("count", tool_call_id="call-1"), DUPLICATE_TOOL_CALL)
+    refused(env.run("count", tool_call_id="call-2"), DUPLICATE_TOOL_CALL)
+    assert len(env.calls) == 2
+    assert len(env.proxy.guard) == 2
 
 
 def test_missing_tool_call_id_skips_the_guard_but_not_single_use(env):

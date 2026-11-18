@@ -2,8 +2,10 @@
 # Generated with `pip freeze --exclude-editable` in a Python 3.11 project venv.
 # Use: python -m pip install -e ".[dev]" -c constraints-dev.txt
 # Runtime: pydantic (decision NFR-002 Pydantic part, approved 2026-10-28) and its
-# required dependencies. Dev tools: pytest, ruff and their dependencies (C-01).
+# required dependencies. Dev tools: pytest, ruff and their dependencies (C-01);
+# coverage (D-22, approved 2026-11-18).
 annotated-types==0.8.0
+coverage==7.17.3
 iniconfig==2.3.1
 packaging==26.3
 pluggy==1.7.0

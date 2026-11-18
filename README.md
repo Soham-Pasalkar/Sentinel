@@ -38,7 +38,7 @@ with SentinelClient(SecurityPolicy(version="v1"), config) as client:
     print([e.event_type for e in client.audit_events(result.request_id)])
 ```
 
-A runnable version is in [`examples/quickstart.py`](examples/quickstart.py) (`python examples/quickstart.py`; it uses a temporary database and leaves no file behind).
+A fuller runnable example is [`examples/quickstart.py`](examples/quickstart.py) (`python examples/quickstart.py`). It shows an allowed call, a path traversal out of the granted workspace, an ungranted tool, an unknown agent and a destructive tool that requires approval. It prints each request's audit rows and how often each tool actually ran: only the allowed call does. Everything happens in a temporary directory that is removed at the end.
 
 ## How a request is handled
 
@@ -71,7 +71,7 @@ Everything in `sentinel.__all__` is public; every other module and name is inter
 
 - `register_tool(name, *, arg_schema, destructive, path_args=(), sync_fn=None, async_fn=None)`. Names are unique, `arg_schema` must forbid extra fields, and `destructive` must be stated.
 - `register_agent(agent_id, *, credential=None, user_id=None, disabled=False, grants=())`. Register tools first, then agents; credentials are `SecretStr` values, stored as digests.
-- `audit_events(request_id=None, limit=100)` is read-only. It returns at most `limit` events (1 to 1,000), the first in sequence order, and raises `AuditUnavailableError` if the store cannot be read.
+- `audit_events(request_id=None, limit=100)` is read-only. It returns at most `limit` events (1 to 1,000), the first in sequence order, and raises `AuditUnavailableError` if the store cannot be read. A stored row with values Sentinel never writes (for example after the file was edited outside Sentinel) raises `AuditIntegrityError`, a `SentinelError`. This detects malformed rows only; it is not tamper evidence.
 - `close()` closes the audit store; afterwards requests return `AUDIT_UNAVAILABLE` and nothing runs.
 
 ## Current status
@@ -93,7 +93,7 @@ Everything in `sentinel.__all__` is public; every other module and name is inter
 | Rate limits (C-15) | **not implemented**: grants with a rate limit are refused |
 | Framework adapters, LangGraph and LangChain (C-16) | **not implemented**; design approved (D-12) |
 
-Milestone M1 is implemented. Its gate (G-M1) is **not yet closed**: it also requires a coverage measurement, which needs a development tool not yet approved (decision D-22), and an owner review.
+Milestone M1 is implemented and independently reviewed. Branch coverage is measured and enforced in CI (NFR-006). Its gate (G-M1) is **not yet closed**: the owner's review of M1 is still pending, including interpretations I-24 to I-35.
 
 ## Known limitations
 
@@ -114,7 +114,7 @@ The full lists are in the decision register (§2, §4.6, §6) and [`docs/aidlc/0
 
 ## Installation and development setup
 
-Create a project-local virtual environment and install the package in editable mode with the development tools (pytest, Ruff):
+Create a project-local virtual environment and install the package in editable mode with the development tools (pytest, Ruff, coverage.py):
 
 ```bash
 python3.11 -m venv .venv
@@ -129,12 +129,14 @@ python -m pip install -e ".[dev]" -c constraints-dev.txt
 
 ```bash
 pytest                     # tests
+coverage run -m pytest && coverage json -q && python scripts/check_coverage.py coverage.json
+                           # tests with branch coverage and the NFR-006 thresholds
 ruff check .               # lint
 ruff format --check .      # formatting check (use `ruff format .` to apply)
 python examples/quickstart.py
 ```
 
-The same checks run in GitHub Actions (`.github/workflows/ci.yml`) on every push to `main` or `c01-project-scaffold` and on every pull request.
+The same checks run in GitHub Actions (`.github/workflows/ci.yml`) on every push to `main` or `c01-project-scaffold` and on every pull request. Every test job runs the full suite under branch coverage and fails if a threshold is missed: at least 90% branch coverage for each of `policy.py`, `proxy.py`, `pipeline.py`, `paths.py`, `audit.py` and `store.py`, and at least 85% overall.
 
 ## Package name
 

@@ -22,12 +22,13 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import TracebackType
 from typing import Any
 
 from pydantic import BaseModel, SecretStr
 
+from sentinel.audit import EVENT_TYPES
 from sentinel.config import SentinelConfig
 from sentinel.exceptions import AuditIntegrityError, InvalidRequestError
 from sentinel.models import Decision, Execution, PipelineResult, ToolGrant
@@ -35,7 +36,7 @@ from sentinel.pipeline import build_pipeline
 from sentinel.policy import SecurityPolicy
 from sentinel.proxy import pass_through_filter
 from sentinel.registry import _MISSING, ToolRegistry
-from sentinel.store import AuditRow
+from sentinel.store import SCHEMA_VERSION, AuditRow
 
 __all__ = ["MAX_AUDIT_EVENTS", "AuditEvent", "SentinelClient"]
 
@@ -69,15 +70,55 @@ class AuditEvent:
     schema_version: int
 
 
+_REQUIRED_TEXT = ("event_id", "request_id", "event_type", "occurred_at")
+_OPTIONAL_TEXT = (
+    "agent_id",
+    "session_id",
+    "tool",
+    "decision",
+    "reason",
+    "policy_version",
+    "action_digest",
+    "execution",
+    "detail",
+)
+
+
 def _event(row: AuditRow) -> AuditEvent:
+    """Build the public record from a stored row, validating it strictly.
+
+    The store is append-only through Sentinel's API only, so a row read back
+    may have been altered outside it (C4.6). Any value Sentinel would never
+    have written (wrong column type, unknown event type, decision or
+    execution, unsupported schema version, invalid ``seq``, or a timestamp
+    that is malformed or not timezone-aware UTC) raises
+    ``AuditIntegrityError`` with fixed text: no stored value and no
+    underlying exception is exposed (SEC-008).
+    """
+    integrity = AuditIntegrityError("audit row has an invalid value")
+    if type(row.seq) is not int or row.seq < 1:
+        raise integrity
+    if type(row.schema_version) is not int or row.schema_version != SCHEMA_VERSION:
+        raise integrity
+    for name in _REQUIRED_TEXT:
+        if type(getattr(row, name)) is not str:
+            raise integrity
+    for name in _OPTIONAL_TEXT:
+        value = getattr(row, name)
+        if value is not None and type(value) is not str:
+            raise integrity
+    if row.event_type not in EVENT_TYPES:
+        raise integrity
     try:
         decision = None if row.decision is None else Decision(row.decision)
         execution = None if row.execution is None else Execution(row.execution)
         occurred_at = datetime.fromisoformat(row.occurred_at)
     except ValueError:
-        raise AuditIntegrityError("audit row has an unknown value") from None
+        raise integrity from None
+    if occurred_at.utcoffset() != timedelta(0):  # naive (None) or not UTC
+        raise integrity
     return AuditEvent(
-        seq=int(row.seq or 0),
+        seq=row.seq,
         event_id=row.event_id,
         request_id=row.request_id,
         event_type=row.event_type,
@@ -217,6 +258,9 @@ class SentinelClient:
             TypeError: ``request_id`` is not a ``str`` or ``limit`` not an int.
             InvalidRequestError: empty ``request_id`` or ``limit`` out of range.
             AuditUnavailableError: the store is closed or cannot be read.
+            AuditIntegrityError: a stored row holds a value Sentinel never
+                writes (the file was changed outside Sentinel's API). It is a
+                ``SentinelError``; no stored value appears in the message.
         """
         if request_id is not None and type(request_id) is not str:
             raise TypeError("request_id must be a str or None")
