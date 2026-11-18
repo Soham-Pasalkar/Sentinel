@@ -376,11 +376,28 @@ C-01 … C-12 complete; NFR-006 coverage met; README accurate; threat model revi
 
 ### C-13 — Detection heuristics (M2)
 Recursive argument scanning, injection and sensitive-data rules, benign corpus, alert manager. **Blocked by:** D-24e, D-24h, the owner's review of the rule and severity table. **Acceptance:** table-driven tests; measured corpus counts; documented evasion test. **Invariants:** SEC-012, SEC-020.
+- **Rev. 28 status: implemented (2026-11-18)** after the owner's decisions (decision record §12, rev. 18: OD-1 to OD-10; PI-04 MEDIUM). The alert manager (FR-020) moved to C-15 (OD-6).
+  - **Scope:** `detector.py` (`HeuristicDetector`: 16 rules plus `SC-01`; public codes `PROMPT_INJECTION`, `SENSITIVE_DATA`, `SCAN_INCOMPLETE`; limits 32 / 10,000 / 1,000,000; evidence without argument content); `build_pipeline` defaults to it (OD-8); `scripts/check_coverage.py` adds `detector.py` at ≥90% (OD-9). No runtime dependency, no public API change; the authorization, approval and execution paths are unchanged.
+  - **Pre-commit review fix:** dictionaries are now checked against the remaining value and character budgets before their keys are sorted or scanned (resource guard; limits unchanged).
+  - **G-1 (C-09 audit masking, owner-authorized):** the quadratic JWT masking pattern replaced by a linear, possessive one that masks a superset; all seven patterns reviewed; tests in testing strategy §18. **Scope note:** the detector limits bound detector traversal, not earlier request processing (G-2, open).
+  - **Tests (254 new):** testing strategy §17. Corpus: 400 benign (0 blocked), 165 malicious (all detected, 90 blocked), 26 documented evasions (0 blocked). Mutation checks: 39 of 39 killed.
+  - **Evidence (local, macOS, Python 3.11.14):** 1461 passed, 1 xfailed (also with `RuntimeWarning` as an error); branch coverage `detector.py` 89/90 (98.89%), `pipeline.py` 125/134 (93.28%), overall 730/752 (97.07%), NFR-006 check passed; Ruff and format clean; `pip check` clean. CI: not yet run (the changes are not committed).
 
 ### C-14 — Output filtering (M3)
 Redaction across nested containers; `redact`/`block`; unsupported types withheld. **Blocked by:** D-19 (mode). **Acceptance:** canary redaction and blocking tests.
 
 ### C-15 — Rate limits (M4)
+*Rev. 28: also the alert manager (FR-020), moved from C-13 by the owner (OD-6).*
+
+#### G-3 audit confidentiality (rev. 30)
+- **Authorization:** the owner, 2026-11-18 (decision record §12, rev. 20): the complete G-3 design approved and its implementation authorized; commit and push **not** authorized.
+- **Change:** new internal module `audit_shape.py` (bounded schema keys, argument summary, path metadata, identifier rules); `registry.py` (tool-name rule, schema bounds, cached keys and labels); `identity.py` (`agent_id` rule, internal registered-agent check); `gateway.py` (`session_id` rule); `pipeline.py` (placeholders in identity and tool columns, structural REQUEST_RECEIVED detail, `paths_canonicalised` in DECISION). No dependency, no public API change; D-07 binding, D-31 guard, C-13 and G-1 unchanged.
+- **Tests:** testing strategy §19 (99 new; 3 existing tests updated to the amended contracts). 25 G-3 mutants caught.
+- **Evidence (local, macOS, Python 3.11.14):** see `NEXT_SESSION.md`. Not committed; CI not run.
+- **Rev. 31: F-1 remediation (owner-approved 2026-11-18; decision record §12, rev. 21).** The independent G-3 review found that a schema whose validators accept undeclared keys let a request-supplied key reach FINDING evidence. `detector.py` now names a top-level argument only through the registered tool's cached `SchemaKeys.named` labels (`audit_shape.py`), otherwise by position; `build_pipeline` wires the resolver. Detection unchanged. F-2 documentation (D-08, I-19) and the F-3 `audit_events` canary extension included. Tests: testing strategy §19.1 (23 new; 18 mutants caught). Not committed; CI not run.
+
+#### Pre-release hardening item G-2 (rev. 29): request-size ceiling before detection
+Not started; needs a separate owner-approved change. The C-13 limits bound the detector only; REQUEST_RECEIVED masking, schema validation and canonical action encoding process the whole request first (threat model T-22). Recommended: a fixed, iterative, early-exit preflight in the pipeline before REQUEST_RECEIVED masking, with ceilings above the detector's limits (so `SCAN_INCOMPLETE` behaviour is unchanged), refusing with the existing `INVALID_REQUEST`; no public API change. **Blocks a production release, not C-13.**
 Atomic per-agent counters with an injected clock; policy row 5. **Blocked by:** D-20; the cross-agent constraint mechanism (brief §12). **Acceptance:** FR-019 tests.
 
 ### C-16 — Framework adapter `wrap_tools`, Design B (M5) — rev. 3
@@ -486,3 +503,7 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 25 | C-11 remediation (I-28 async cancellation lifecycle), authorized by the owner 2026-11-18 as G-M1 review evidence; G-M1 still open |
 | 26 | G-M1 owner review: I-24 to I-27 and I-30 to I-35 confirmed; documentation corrected (README, SEC-027, NEXT_SESSION); closure approved, effective once that correction passes CI |
 | 27 | **G-M1 closed** (2026-11-18) after CI run 44291157573 on `8300360`; M1 complete; C-13 still blocked |
+| 28 | C-13 implemented after the owner's decisions OD-1 to OD-10 (PI-04 MEDIUM); FR-020 moved to C-15 |
+| 29 | G-1 audit-masking remediation (C-09, I-18 rev. 19); C-13 separator tests and scope note; G-2 recorded as a pre-release item |
+| 30 | G-3 audit confidentiality implemented after the owner's approval (decision record §12, rev. 20); uncommitted |
+| 31 | F-1 remediation (FINDING evidence names only schema labels), F-2 documentation, F-3 canary extension (decision record §12, rev. 21); uncommitted |

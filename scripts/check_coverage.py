@@ -6,8 +6,9 @@ Usage (after ``coverage run -m pytest`` and ``coverage json``)::
 
 Thresholds (NFR-006, approved by the owner 2026-11-18): branch coverage of at
 least 90% for each of ``policy.py``, ``proxy.py``, ``pipeline.py``,
-``paths.py``, ``audit.py`` and ``store.py``, measured per file, and at least
-85% over every production module under ``src/sentinel``.
+``paths.py``, ``audit.py``, ``store.py`` and (C-13, OD-9) ``detector.py``,
+measured per file, and at least 85% over every production module under
+``src/sentinel``.
 
 Branch coverage is ``covered_branches / num_branches`` (branch arcs), not
 coverage.py's combined line-and-branch percentage. Comparisons use integers,
@@ -34,6 +35,7 @@ DEFAULT_SOURCE = REPO / "src" / "sentinel"
 #: Per-module minimum branch coverage, in percent (NFR-006).
 MODULE_THRESHOLDS: dict[str, int] = {
     "audit.py": 90,
+    "detector.py": 90,
     "paths.py": 90,
     "pipeline.py": 90,
     "policy.py": 90,

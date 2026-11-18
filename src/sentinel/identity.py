@@ -40,6 +40,7 @@ from dataclasses import dataclass, field
 
 from pydantic import SecretStr, ValidationError
 
+from sentinel.audit_shape import identity_problem
 from sentinel.exceptions import ConfigurationError, RegistrationError
 from sentinel.models import (
     CapabilityEnvelope,
@@ -126,6 +127,11 @@ class IdentityStore:
         """
         if type(agent_id) is not str or not agent_id:
             raise RegistrationError("agent_id must be a non-empty string")
+        if identity_problem(agent_id) is not None:
+            # G-3: 1-128 characters, no control characters; never truncated.
+            raise RegistrationError(
+                "agent_id must be 1-128 characters without control characters"
+            )
         if user_id is not None and (type(user_id) is not str or not user_id):
             raise RegistrationError("user_id must be a non-empty string or None")
         if type(disabled) is not bool:
@@ -173,6 +179,16 @@ class IdentityStore:
         else:
             prefixes = ()
         return ToolGrant(tool=grant.tool, allowed_path_prefixes=prefixes)
+
+    def _is_registered(self, agent_id: object) -> bool:
+        """Whether ``agent_id`` is a registered agent (exact ``str`` only).
+
+        The value is checked against the identifier rules first, so a lookup
+        never hashes an oversized or non-``str`` value (G-3).
+        """
+        if identity_problem(agent_id) is not None:
+            return False
+        return agent_id in self._agents
 
     def authenticate(self, request: SecurityRequest) -> SecurityContext:
         """Return the authentication facts for ``request.agent_id``.

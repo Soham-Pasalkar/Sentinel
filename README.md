@@ -1,6 +1,6 @@
 # Sentinel
 
-> **Status: pre-release (milestone M1 implemented and signed off by the owner, 2026-11-18).** Sentinel authorizes, executes and audits tool calls routed through `SentinelClient`. Threat detection, output filtering, rate limits and framework adapters are **not implemented yet**. Do not rely on it as your only security control.
+> **Status: pre-release (milestone M1 implemented and signed off by the owner, 2026-11-18).** Sentinel authorizes, executes and audits tool calls routed through `SentinelClient`, with heuristic, advisory detection on tool-call arguments (C-13). Output filtering, rate limits and framework adapters are **not implemented yet**. Do not rely on it as your only security control.
 
 Sentinel is a runtime security library for AI agent systems. It sits between agents and the tools they invoke and decides, for each tool call, whether that call may execute. A call that Sentinel denies, or that requires approval, never executes. Every step is recorded in a local audit log.
 
@@ -69,8 +69,8 @@ Everything in `sentinel.__all__` is public; every other module and name is inter
 | `AuditEvent` | An immutable audit record returned by `audit_events` |
 | `SentinelError`, `ConfigurationError`, `RegistrationError`, `InvalidRequestError`, `AuditUnavailableError` | Exceptions |
 
-- `register_tool(name, *, arg_schema, destructive, path_args=(), sync_fn=None, async_fn=None)`. Names are unique, `arg_schema` must forbid extra fields, and `destructive` must be stated.
-- `register_agent(agent_id, *, credential=None, user_id=None, disabled=False, grants=())`. Register tools first, then agents; credentials are `SecretStr` values, stored as digests.
+- `register_tool(name, *, arg_schema, destructive, path_args=(), sync_fn=None, async_fn=None)`. Names are unique and match `[A-Za-z0-9_-]{1,64}`; `arg_schema` must forbid extra fields and may declare at most 100 top-level fields and 100 accepted keys (field names and aliases); `destructive` must be stated.
+- `register_agent(agent_id, *, credential=None, user_id=None, disabled=False, grants=())`. Register tools first, then agents; `agent_id` is 1–128 characters without control characters; credentials are `SecretStr` values, stored as digests. A request's `session_id` follows the same rule (otherwise `INVALID_REQUEST`). Valid `agent_id` and `session_id` values are stored in the audit as given, so don't put secrets or personal data in them.
 - `audit_events(request_id=None, limit=100)` is read-only. It returns at most `limit` events (1 to 1,000), the first in sequence order, and raises `AuditUnavailableError` if the store cannot be read. A stored row with values Sentinel never writes (for example after the file was edited outside Sentinel) raises `AuditIntegrityError`, a `SentinelError`. This detects malformed rows only; it is not tamper evidence.
 - `close()` closes the audit store; afterwards requests return `AUDIT_UNAVAILABLE` and nothing runs.
 
@@ -88,20 +88,22 @@ Everything in `sentinel.__all__` is public; every other module and name is inter
 | Execution proxy (C-10) | implemented |
 | Pipeline (C-11) | implemented |
 | Public client, quickstart (C-12) | implemented |
-| Threat detection (C-13) | **not implemented**: the detector finds nothing |
+| Threat detection (C-13) | implemented: heuristic and advisory; scans tool-call argument strings only (see Limitations) |
 | Output filtering (C-14) | **not implemented**: the output filter is a pass-through |
 | Rate limits (C-15) | **not implemented**: grants with a rate limit are refused |
 | Framework adapters, LangGraph and LangChain (C-16) | **not implemented**; design approved (D-12) |
 
-Milestone M1 is implemented and independently reviewed. Branch coverage is measured and enforced in CI (NFR-006). The owner has reviewed M1 and confirmed every C-11 and C-12 interpretation (I-24 to I-35; I-28 and I-29 in their 2026-11-18 wording), and closed its gate (G-M1) on 2026-11-18. Closing G-M1 does not start M2: threat detection (C-13) still awaits further owner decisions.
+Milestone M1 is implemented and independently reviewed. Branch coverage is measured and enforced in CI (NFR-006). The owner has reviewed M1 and confirmed every C-11 and C-12 interpretation (I-24 to I-35; I-28 and I-29 in their 2026-11-18 wording), and closed its gate (G-M1) on 2026-11-18. Threat detection (C-13, milestone M2) was then implemented after the owner's decisions of 2026-11-18 (D-24e, D-24h and the rule catalogue).
 
 ## Known limitations
 
-- **In-process only.** Sentinel constrains only tool calls routed through `SentinelClient`. Code in the same process can call tools directly, forge decisions or patch Sentinel.
-- **No detection or output filtering yet.** Until C-13 and C-14, prompt injection and sensitive data in arguments or outputs are not detected. When added, detection will be heuristic: it reduces risk and does not prevent prompt injection.
+- **In-process only.** Sentinel constrains only tool calls routed through `SentinelClient`. Code in the same process can call tools directly, forge decisions or patch Sentinel. Request objects are built by your application code: Sentinel calls methods of the request mapping and does not defend against hostile Python objects your application passes in.
+- **Detection is heuristic and advisory; it does not prevent prompt injection or data leakage.** The detector (C-13) looks for known phrases, model control tokens, invisible characters and credential or personal-data patterns in tool-call **arguments** only. It does not see the model's context, retrieved documents or tool outputs (output filtering is C-14, not implemented). Rephrasing, other languages, encodings and splitting text across values evade it, and it can flag legitimate text. Findings are signals: the policy denies only at or above `deny_at_severity` (default `HIGH`), and the security guarantees are the deterministic controls (identity, grants, path containment, approval for destructive tools, single-use decisions, audit). Arguments larger than the scan limits (1,000,000 characters, 10,000 values or 32 levels of nesting) are always denied (`SCAN_INCOMPLETE`). These limits bound the detector's own work, not the whole request: validation, canonical encoding and audit recording process the full request before detection, and there is no request-size limit yet (tracked as a pre-release hardening item).
 - **Granted tools are trusted with their arguments.** A grant covers a whole tool; free-form arguments (SQL, shell, URLs) are only as safe as the tool and its schema.
 - **Paths are authorized, not isolated.** A symlink swapped after the final check, hard links, paths a tool derives internally, and mount boundaries are not covered. Path-constrained tools are supported on Linux and macOS only; registering one on Windows is refused.
-- **The audit log is not tamper-proof.** It is append-only through Sentinel's API only. Anyone with write access to the file can change it; durability depends on the filesystem honouring `fsync`; one process per file. Masking of secrets in audit records is heuristic.
+- **The audit log is not tamper-proof.** It is append-only through Sentinel's API only. Anyone with write access to the file can change it; durability depends on the filesystem honouring `fsync`; one process per file. Masking of secrets in free-text audit details is heuristic.
+- **What the audit stores about a request.** Not the tool arguments: no argument keys sent in the request, no argument values, no file paths and no `tool_call_id`. It stores the request's structure (the tool schema's argument names, value types and sizes, path lengths and flags), the agent and session identifiers you supply, and the decisions and outcomes. Each allowed request also stores an `action_digest`: an unkeyed SHA-256 of that request's exact action, including its request ID. It can't be used to match identical actions across requests, but anyone who can read the audit can test guesses about a request's arguments offline, and arguments with few possible values (known file paths, flags, small numbers, identifiers such as SSNs) can be recovered this way.
+- **Older audit databases.** Databases written by earlier versions may contain argument text. This version does not rewrite or sanitise them. Retire them, together with their `-wal` and `-shm` files and any copies or backups, under your own data-disposal policy; deleting a file is not secure erasure on SSDs, snapshots or backups. Storing the audit on an encrypted volume lets you erase it by destroying the key.
 - **No exactly-once side effects.** If a tool ran and a later step failed (filter, audit), the side effect is not undone, and the result says so. A new call with a new `tool_call_id` is a new request. The at-most-once guards are process-local.
 - **An in-memory audit store (`":memory:"`) never releases output**, because its audit is never complete.
 - **No public async API.** An internal async entry exists for future framework adapters.

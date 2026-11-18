@@ -46,6 +46,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from sentinel.action import AuthorizedAction
+from sentinel.audit_shape import identity_problem
 from sentinel.exceptions import InvalidRequestError
 from sentinel.models import SecurityRequest, ToolSpec
 from sentinel.paths import canonicalise
@@ -111,6 +112,10 @@ def validate_request(
     if not keys <= _REQUIRED_KEYS | _OPTIONAL_KEYS:
         raise InvalidRequestError("request has an unexpected field")
     fields = {key: raw[key] for key in keys}
+    if identity_problem(fields["session_id"]) is not None:
+        # G-3: exact str, 1-128 characters, no control characters. Refused,
+        # never truncated (truncation would merge D-31 guard keys).
+        raise InvalidRequestError("session_id is not a valid identifier")
     arguments = fields["arguments"]
     if type(arguments) is not dict:
         raise InvalidRequestError("arguments must be a dict")

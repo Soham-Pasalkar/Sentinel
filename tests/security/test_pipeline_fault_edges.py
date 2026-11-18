@@ -8,6 +8,7 @@ the result or the audit (C1.6–C1.8, Q-03c, SEC-005, SEC-008, SEC-027, D-29).
 """
 
 import asyncio
+import json
 import logging
 import sqlite3
 
@@ -179,15 +180,15 @@ def test_failed_error_event_write_skips_the_completion(env, monkeypatch):
     assert CANARY not in all_rows_text(env)
 
 
-def test_unrecordable_argument_values_are_marked_not_recorded(env):
-    # A value that cannot be stored (not JSON-native) is replaced in the
-    # REQUEST_RECEIVED detail; the request itself is refused, not denied.
+def test_unrecordable_argument_values_are_recorded_by_type_only(env):
+    # G-3: a value that is not JSON-native is described by its type label
+    # only (never by content); the request itself is refused, not denied.
     raw = env.raw(arguments={"path": {CANARY}})
     r = env.pipeline.evaluate(raw)
     assert (r.decision, r.error_code) == (None, INVALID_REQUEST)
     assert env.calls["read"] == 0
-    detail = env.rows(r.request_id)[0].detail
-    assert "[not recordable]" in detail
+    detail = json.loads(env.rows(r.request_id)[0].detail)
+    assert detail["arguments"]["declared"]["path"] == {"type": "other", "size": None}
     assert CANARY not in all_rows_text(env)
 
 

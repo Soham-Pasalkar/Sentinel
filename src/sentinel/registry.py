@@ -14,6 +14,12 @@ Rules enforced at registration:
 * ``destructive`` is required and must be a ``bool``; there is no default
   (D-06).
 * ``path_args`` must name top-level ``str`` fields of the schema (C1.3).
+* G-3 (owner-approved 2026-11-18): the name must match
+  ``[A-Za-z0-9_-]{1,64}``; the schema may have at most 100 fields and 100
+  accepted top-level key candidates (field names, ``str`` aliases,
+  ``AliasPath`` and ``AliasChoices`` members, duplicates counted), uses only
+  those alias forms, and no key may belong to two fields. The accepted keys
+  and their sanitised audit labels are computed once here and cached.
   Registering a path-constrained tool on Windows raises
   ``ConfigurationError`` (D-21); tools without ``path_args`` are unaffected.
 * The sync callable must be a plain callable: coroutine, generator and async
@@ -37,6 +43,12 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from sentinel.audit_shape import (
+    SchemaKeys,
+    SchemaTooLargeError,
+    schema_keys,
+    valid_tool_name,
+)
 from sentinel.exceptions import RegistrationError
 from sentinel.models import ToolSpec
 from sentinel.paths import require_path_support
@@ -68,6 +80,8 @@ class RegisteredTool:
     spec: ToolSpec
     sync_fn: Callable[..., Any] | None
     async_fn: Callable[..., Any] | None
+    #: Accepted keys and audit labels, computed once at registration (G-3).
+    schema_keys: SchemaKeys | None = None
 
     @property
     def supports_sync(self) -> bool:
@@ -133,12 +147,16 @@ class ToolRegistry:
 
         Raises:
             RegistrationError: a required field is missing; the name is not a
-                non-empty ``str`` or is already registered; the metadata is
-                invalid; or no valid entry point is given.
+                non-empty ``str``, does not match ``[A-Za-z0-9_-]{1,64}`` or is
+                already registered; the metadata is invalid; the schema exceeds
+                the G-3 key bounds or uses unsupported aliases; or no valid
+                entry point is given.
             ConfigurationError: a path-constrained tool on Windows (D-21).
         """
         if type(name) is not str or not name:
             raise RegistrationError("tool name must be a non-empty string")
+        if not valid_tool_name(name):
+            raise RegistrationError("tool name must match [A-Za-z0-9_-]{1,64}")
         if arg_schema is _MISSING:
             raise RegistrationError("arg_schema is required")
         if destructive is _MISSING:
@@ -162,7 +180,15 @@ class ToolRegistry:
             raise RegistrationError("invalid tool metadata") from None
         if spec.path_args:
             require_path_support()
-        tool = RegisteredTool(spec=spec, sync_fn=sync_fn, async_fn=async_fn)
+        try:
+            keys = schema_keys(spec.arg_schema, spec.path_args)
+        except SchemaTooLargeError:
+            raise RegistrationError(
+                "arg_schema exceeds the key bounds or uses unsupported aliases"
+            ) from None
+        tool = RegisteredTool(
+            spec=spec, sync_fn=sync_fn, async_fn=async_fn, schema_keys=keys
+        )
         with self._lock:
             if name in self._tools:
                 raise RegistrationError("tool name is already registered")

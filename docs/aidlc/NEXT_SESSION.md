@@ -2,7 +2,7 @@
 
 Checkpoint of 2026-11-18, after the G-M1 owner review and closure (before that: the I-28 async-cancellation remediation of C-11; the C-12 independent review and remediation; first written 2026-11-08, after C-12). This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
 
-> **2026-11-18: development resumed by the owner for the C-12 remediation only.** That work is done (§2a). **Later on 2026-11-18 the owner approved the I-28 remediation decisions and authorized their implementation as C-11 remediation evidence for the G-M1 review** (decision record §12, rev. 16). That work is done (§2b). **The owner then reviewed M1 (decision record §12, rev. 17): every interpretation I-1 to I-35 is now confirmed. G-M1 is CLOSED (2026-11-18, §5)**, after the documentation correction `8300360` passed CI. **C-13 stays blocked even after closure**: it needs D-24e, D-24h and the owner's review of the rule and severity table. No other implementation is authorized.
+> **2026-11-18: development resumed by the owner for the C-12 remediation only.** That work is done (§2a). **Later on 2026-11-18 the owner approved the I-28 remediation decisions and authorized their implementation as C-11 remediation evidence for the G-M1 review** (decision record §12, rev. 16). That work is done (§2b). **The owner then reviewed M1 (decision record §12, rev. 17): every interpretation I-1 to I-35 is now confirmed. G-M1 is CLOSED (2026-11-18, §5)**, after the documentation correction `8300360` passed CI. **The owner then decided C-13 (decision record §12, rev. 18: OD-1 to OD-10, PI-04 MEDIUM) and approved its implementation. C-13 is implemented in the working tree (§2c) and awaits the owner's commit/push decision.** No other implementation is authorized.
 
 ## 1. Purpose and architecture
 
@@ -12,13 +12,13 @@ Sentinel is an in-process Python library that sits between AI agents and their t
 
 1. **gateway** (C-06): shape, registered tool, reserved identity keys, strict schema validation, canonical paths, and the exact `AuthorizedAction` candidate;
 2. **identity** (C-07): authentication facts and tool-level grants;
-3. **detector**: a stub that finds nothing until C-13;
+3. **detector** (C-13): heuristic and advisory findings on argument strings (D-24e, D-24h); only policy decides;
 4. **policy** (C-08): deterministic, default deny, bound to the exact action;
 5. **proxy** (C-10): the sole invoker of tools, with binding re-check, single-use decisions, the `tool_call_id` guard, path re-verification and the output-filter stage (a pass-through until C-14).
 
 The pipeline (C-11) is the only audit writer. It commits every C4.3 event to SQLite (C-09) before the next stage runs, and maps outcomes to `PipelineResult` (C1.6). `audit_events` gives bounded, read-only access to the audit (D-17). Everything outside `sentinel.__all__` is internal, including the async pipeline entry (D-30).
 
-**Not implemented:** heuristic detection (C-13), real output filtering (C-14), rate limits (C-15), framework adapters for LangGraph and LangChain (C-16), and release readiness (C-18).
+**Not implemented:** real output filtering (C-14), rate limits (C-15), framework adapters for LangGraph and LangChain (C-16), and release readiness (C-18).
 
 ## 2. Increment status and commits
 
@@ -38,6 +38,12 @@ The pipeline (C-11) is the only audit writer. It commits every C4.3 event to SQL
 | C-12 public client, quickstart, README | implemented `53955f9`; **independently reviewed and remediated 2026-11-18** (§2a) | `53955f9` + remediation commit |
 
 Decision and documentation commits, in order: `bde7265`, `6c1ef3e`, `f64c8f6`, `fb4be1b`, `0794336`, `7efb7f2`, `deab308`, `65a4550`, `5d6ce77`, `eebfcc4`, `1292974` (the C-12 decisions).
+
+### 2c. C-13 heuristic detection (2026-11-18)
+
+**Decisions** (decision record §12, rev. 18): D-24e corrected (detector failure is `INTERNAL_ERROR`, never DENY), D-24h (advisory wording), the 16-rule catalogue plus `SC-01` (PI-04 MEDIUM by the owner's answer), `SCAN_INCOMPLETE` (`CRITICAL`, always denied), limits 32 / 10,000 / 1,000,000, coarse public codes, FR-020 moved to C-15, the heuristic detector as the client default, `detector.py` at ≥90% branch coverage, the amended T-04 test plan.
+
+**Implemented** (`detector.py`; one-line default in `build_pipeline`; the coverage script): 254 new tests (testing strategy §17), including a dictionary preflight added in the pre-commit review (oversized dictionaries are rejected before their keys are sorted); corpus 400 benign (0 blocked), 165 malicious (all detected, 90 blocked), 26 documented evasions (0 blocked); 39 of 39 mutants killed. Locally on Python 3.11.14: 1,461 passed, 1 xfailed; `detector.py` 98.89%, overall 97.07% branch coverage. **G-1 (owner-authorized):** the audit-masking JWT pattern was quadratic on crafted text (reachable before validation); it is now linear and masks a superset; all seven patterns reviewed (testing strategy §18). **G-2 (open, pre-release):** no request-size ceiling before the detector (threat model T-22; implementation plan rev. 29). **G-3 (owner-approved and implemented, uncommitted):** the audit no longer stores tool-argument keys or values, path strings or `tool_call_id`; REQUEST_RECEIVED keeps bounded structural metadata; identifier and tool-name rules; bounded schema keys; action-digest disclosure; older databases documented, not sanitised (decision record rev. 20; testing strategy §19). **F-1 (owner-approved remediation of the G-3 review finding):** FINDING evidence now names a top-level argument only by the registered schema's label, otherwise by position, so a schema that accepts undeclared keys can no longer put a request-supplied key in the audit; F-2 documentation and the F-3 canary extension done (decision record rev. 21; testing strategy §19.1). Locally on Python 3.11.14: 1,632 passed, 1 xfailed; `detector.py` 98.91%, `audit_shape.py` 92.71%, overall 96.55% branch coverage; 18 of 18 F-1 mutants caught. **Not yet committed or run in CI** (commit and push not authorized). Details: implementation plan revs. 28–31.
 
 ### 2a. C-12 independent review and remediation (2026-11-18)
 
@@ -168,6 +174,7 @@ mypy is not a G-M1 item (NFR-005 is a SHOULD and not in the gate); it stays unap
 **Approved:**
 - D-01, D-02 (provisional names), D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-11, D-12;
 - D-13, D-14, D-15 (complete), D-16, D-17, D-18, D-20 (audit writes and pipeline), D-21, D-23;
+- **D-24e and D-24h, the C-13 rule catalogue (2026-11-18, rev. 18);**
 - D-24a, D-24b, D-24c, D-24d, D-24f, D-24i (complete), D-25 … D-31 (with the D-31 defaults);
 - D-19 failure rule; Q-03c; the operational-refusal table; FR-022;
 - NFR-002 (Pydantic only; no SQLAlchemy).
@@ -179,7 +186,6 @@ mypy is not a G-M1 item (NFR-005 is a SHOULD and not in the gate); it stays unap
 | Decision | Blocks |
 |---|---|
 | D-22 remainder (mypy, Hypothesis; pytest-cov not needed) | NFR-005; property tests (not G-M1) |
-| D-24e (detector interface, recursive scan, detector failure), D-24h (advisory wording), owner review of the rule and severity table | C-13 |
 | D-19 M3 mode (recorded: default `redact`; unsupported types withheld in `enforce`) | C-14 |
 | D-20 rate-limit part; cross-agent constraint mechanism | C-15 |
 | FR-021 `session_id=None` vs the required `session_id` (spec tension to reconcile) | C-16 |
@@ -201,9 +207,8 @@ mypy is not a G-M1 item (NFR-005 is a SHOULD and not in the gate); it stays unap
 *2026-11-08 list (items 1 and 3's coverage part done 2026-11-18):* independent review of C-12; D-22; close G-M1.
 
 1. ~~Owner review of M1~~: **done 2026-11-18** (decision record §12, rev. 17). **G-M1 closed 2026-11-18** (§5).
-2. Only then: **C-13**, which also needs D-24e, D-24h and the owner's review of the rule and severity table.
-
-**C-13 must not begin until G-M1 is closed and the owner has decided D-24e and D-24h and reviewed the rule and severity table.** Closing G-M1 does not authorize C-13.
+2. ~~C-13~~: decided by the owner 2026-11-18 (rev. 18) and implemented (§2c). **Next:** the owner's decision to commit and push it, then CI on the exact commit.
+3. After that: C-14, C-15 (now including FR-020) or C-16, each only when the owner authorizes it and its open decisions are settled.
 
 ## 8. Security constraints not to forget
 
@@ -217,7 +222,8 @@ mypy is not a G-M1 item (NFR-005 is a SHOULD and not in the gate); it stays unap
 
 ## 9. Known security limitations
 
-- **Partial protection.** No detection (C-13), no real output filtering (C-14), no rate limits (C-15), no framework adapters (C-16).
+- **Detection is heuristic and advisory** (C-13): arguments only, per string, evadable, may flag legitimate text; it does not prevent prompt injection or data leakage. Arguments beyond the scan limits are always denied (`SCAN_INCOMPLETE`).
+- **Partial protection.** No real output filtering (C-14), no rate limits (C-15), no framework adapters (C-16).
 - **In-process boundary.** Only calls routed through `SentinelClient` are controlled. Code in the same process can call tools directly, forge decisions or patch Sentinel.
 - **Granted tools are trusted with their validated arguments** (whole-tool grants, D-24b; T-02).
 - **Paths are authorized, not isolated:**

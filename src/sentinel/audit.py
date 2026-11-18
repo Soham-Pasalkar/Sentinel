@@ -116,6 +116,14 @@ _SENSITIVE_KEY_PARTS = (
     "cookie",
     "sessionkey",
 )
+# Value patterns, applied to whole strings before truncation (I-18, I-19).
+# Each is linear in the text length (G-1 review, 2026-11-18): a literal
+# anchor; either a fixed length (AKIA), or an open-ended run with nothing
+# required after it, so a match succeeds by consuming the run or fails
+# within its minimum length (gh*_, sk-, xox*-, JWT); or, for PEM and bearer,
+# backtracking confined to one run of header letters or whitespace, after
+# which the match always succeeds (PEM to its END line or the end of the
+# text).
 _PATTERNS = tuple(
     re.compile(p)
     for p in (
@@ -127,7 +135,14 @@ _PATTERNS = tuple(
         r"\bgh[pousr]_[A-Za-z0-9]{20,}",
         r"\bsk-[A-Za-z0-9_-]{16,}",
         r"\bxox[abprs]-[A-Za-z0-9-]{10,}",
-        r"\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}",
+        # JWT-like: "eyJ" and 5+ token characters, then the whole dotted run.
+        # G-1 (2026-11-18): the previous form required two later segments
+        # after an unbounded first one, so on text like "eyJ-eyJ-..." every
+        # start scanned to the end of the run and backtracked: quadratic.
+        # This form is possessive throughout and has no condition that can
+        # fail after the first five characters, so each match consumes its
+        # run once. It masks a superset of what the previous form masked.
+        r"\beyJ[A-Za-z0-9_-]{5,}+(?:\.[A-Za-z0-9_-]++)*+",
     )
 )
 

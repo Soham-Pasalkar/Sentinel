@@ -97,8 +97,13 @@ def test_canary_reaches_no_sink(make_env, canary, caplog):
     }
     for name, text in sinks.items():
         assert canary not in text, name
+    # G-3: REQUEST_RECEIVED keeps only structure. The declared "password"
+    # field's metadata is itself masked by its sensitive name (I-18).
     stored = [json.loads(r.detail) for r in env.store.read() if r.detail]
-    assert any(d.get("arguments", {}).get("password") == "[MASKED]" for d in stored)
+    assert any(
+        d.get("arguments", {}).get("declared", {}).get("password") == "[MASKED]"
+        for d in stored
+    )
 
 
 def test_tool_exception_text_never_reaches_the_caller(env, canary):

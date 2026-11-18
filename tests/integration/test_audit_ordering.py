@@ -207,14 +207,24 @@ def test_every_event_carries_the_request_identity(env):
     assert len(digests) == 1 and None not in digests
 
 
-def test_request_received_keeps_the_masked_original_arguments(env):
+def test_request_received_keeps_path_structure_not_the_path(env):
+    # G-3 (C2.4 amended, owner 2026-11-18): the original path is no longer
+    # stored; its structure is, and DECISION says whether canonicalisation
+    # changed it.
     import json
 
-    r = env.pipeline.evaluate(
-        env.raw(arguments={"path": str(env.ws) + "/sub/../data.txt"})
-    )
-    detail = json.loads(env.rows(r.request_id)[0].detail)
-    assert detail["arguments"]["path"].endswith("/sub/../data.txt")  # as received
+    original = str(env.ws) + "/sub/../data.txt"
+    r = env.pipeline.evaluate(env.raw(arguments={"path": original}))
+    rows = env.rows(r.request_id)
+    received = json.loads(rows[0].detail)
+    assert received["paths"]["path"] == {
+        "length": len(original),
+        "components": original.count("/"),
+        "has_dotdot": True,
+    }
+    decision = json.loads(next(x for x in rows if x.event_type == "DECISION").detail)
+    assert decision["paths_canonicalised"] == {"path": True}
+    assert "/sub/" not in " ".join(str(x) for x in rows)
 
 
 def test_events_are_visible_through_a_second_connection_immediately(env):

@@ -1,7 +1,7 @@
 """Pipeline: the sole orchestrator and the only audit writer (C-11; D-16).
 
 ``Pipeline.evaluate(raw)`` runs one request through gateway (C-06), identity
-(C-07), detector (stub until C-13), policy (C-08) and proxy (C-10), commits
+(C-07), detector (C-13, advisory), policy (C-08) and proxy (C-10), commits
 every C4.3 event through ``AuditLogger`` (C-09) before the next stage, and
 returns a ``PipelineResult`` (C1.6). ``await Pipeline.evaluate_async(raw)``
 is the internal async counterpart (D-30): blocking stages run in a worker
@@ -72,10 +72,19 @@ from sentinel.audit import (
     REQUEST_RECEIVED,
     AuditLogger,
     diagnostics_detail,
-    mask,
+)
+from sentinel.audit_shape import (
+    INVALID,
+    UNREGISTERED,
+    SchemaKeys,
+    identity_problem,
+    path_canonicalised,
+    path_metadata,
+    summarize_arguments,
+    valid_tool_name,
 )
 from sentinel.config import SentinelConfig
-from sentinel.detector import NullDetector
+from sentinel.detector import HeuristicDetector, NullDetector
 from sentinel.exceptions import (
     AuditUnavailableError,
     ConfigurationError,
@@ -127,13 +136,6 @@ def _new_request_id() -> str:
     return str(uuid.uuid4())
 
 
-def _column(value: object) -> str | None:
-    """A raw identity field as a bounded, masked column value, or ``None``."""
-    if type(value) is not str or not value:
-        return None
-    return mask(value)
-
-
 @dataclass
 class _Flow:
     """Mutable per-request state, used only by the pipeline."""
@@ -149,6 +151,9 @@ class _Flow:
     digest: str | None = None
     run: ProxyRun | None = None
     started: bool = False
+    #: The request's ``arguments`` object, kept in memory only, to compare
+    #: path arguments with their canonical form (G-3). Never persisted.
+    raw_arguments: Any = None
 
 
 @dataclass(frozen=True)
@@ -704,7 +709,8 @@ class Pipeline:
         stage = "request"
         try:
             flow.columns = self._raw_columns(raw)
-            if not self._write(flow, REQUEST_RECEIVED, detail=self._raw_detail(raw)):
+            detail = self._raw_detail(raw, flow)
+            if not self._write(flow, REQUEST_RECEIVED, detail=detail):
                 return self._audit_failed(flow)
             flow.received = True
 
@@ -721,9 +727,9 @@ class Pipeline:
             flow.validated = validated
             request = validated.request
             flow.columns = {
-                "agent_id": request.agent_id,
-                "session_id": request.session_id,
-                "tool": request.tool,
+                "agent_id": self._agent_column(request.agent_id),
+                "session_id": request.session_id,  # valid: the gateway checked it
+                "tool": request.tool,  # a registered name
             }
 
             stage = "identity"
@@ -754,6 +760,16 @@ class Pipeline:
             flow.decision = decision.decision
             flow.policy_reason = decision.reason
             flow.digest = decision.action.digest
+            decision_detail: dict[str, Any] = {
+                "finding_codes": list(decision.finding_codes)
+            }
+            changed = path_canonicalised(
+                flow.raw_arguments,
+                request.arguments,
+                self._schema_keys(request.tool),
+            )
+            if changed:
+                decision_detail["paths_canonicalised"] = changed
             if not self._write(
                 flow,
                 DECISION,
@@ -761,7 +777,7 @@ class Pipeline:
                 reason=decision.reason,
                 policy_version=decision.policy_version,
                 action_digest=flow.digest,
-                detail={"finding_codes": list(decision.finding_codes)},
+                detail=decision_detail,
             ):
                 return self._audit_failed(flow)
             if decision.decision is not Decision.ALLOW:
@@ -1008,29 +1024,85 @@ class Pipeline:
 
     # ---------------------------------------------------- raw input
 
-    @staticmethod
-    def _raw_columns(raw: object) -> dict[str, str | None]:
+    # ------------------------------------------- audit confidentiality (G-3)
+
+    def _schema_keys(self, tool: object) -> SchemaKeys | None:
+        """The cached schema keys of a registered tool, or ``None``."""
+        if not valid_tool_name(tool):
+            return None
+        registered = self._registry.lookup(tool)
+        return None if registered is None else registered.schema_keys
+
+    def _agent_column(self, agent_id: object) -> str | None:
+        """``agent_id`` as stored: registered value or a placeholder (G-3)."""
+        if type(agent_id) is not str or not agent_id:
+            return None
+        if identity_problem(agent_id) is not None:
+            return INVALID
+        if not self._identity._is_registered(agent_id):
+            return UNREGISTERED
+        return agent_id
+
+    def _raw_columns(self, raw: object) -> dict[str, str | None]:
+        """Identity and tool columns before validation; never a raw value.
+
+        ``agent_id``: the registered value, ``[invalid]`` or ``[unregistered]``;
+        ``session_id``: a valid value or ``[invalid]``; ``tool``: a registered
+        name or ``[unregistered]``. ``None`` when missing or not a ``str``.
+        The request mapping is application-built (C1.2); only its ``get`` is
+        called here, as before.
+        """
         if not isinstance(raw, Mapping):
             return {"agent_id": None, "session_id": None, "tool": None}
+        session = raw.get("session_id")
+        if type(session) is not str or not session:
+            session_column = None
+        elif identity_problem(session) is not None:
+            session_column = INVALID
+        else:
+            session_column = session
+        tool = raw.get("tool")
+        if type(tool) is not str:
+            tool_column = None
+        elif self._schema_keys(tool) is None:
+            tool_column = UNREGISTERED
+        else:
+            tool_column = tool
         return {
-            "agent_id": _column(raw.get("agent_id")),
-            "session_id": _column(raw.get("session_id")),
-            "tool": _column(raw.get("tool")),
+            "agent_id": self._agent_column(raw.get("agent_id")),
+            "session_id": session_column,
+            "tool": tool_column,
         }
 
-    @staticmethod
-    def _raw_detail(raw: object) -> dict[str, Any]:
-        """The request as received, masked (C2.4: originals kept masked here)."""
+    def _raw_detail(self, raw: object, flow: _Flow) -> dict[str, Any]:
+        """REQUEST_RECEIVED detail: structure only, never content (G-3).
+
+        Bounded metadata about ``arguments`` (``audit_shape``), path metadata,
+        and whether a ``tool_call_id`` was present. No argument key or value,
+        path string or ``tool_call_id`` is recorded.
+        """
         if not isinstance(raw, Mapping):
             return {"shape": "not a mapping"}
-        detail: dict[str, Any] = {}
-        for key in ("arguments", "tool_call_id"):
-            if key in raw:
-                try:
-                    detail[key] = mask(raw[key])
-                except ValueError:
-                    detail[key] = "[not recordable]"
-        return detail
+        arguments = raw.get("arguments")
+        flow.raw_arguments = arguments
+        keys = self._schema_keys(raw.get("tool"))
+        return {
+            "arguments": summarize_arguments(arguments, keys),
+            "paths": path_metadata(arguments, keys),
+            "tool_call_id_present": "tool_call_id" in raw,
+        }
+
+
+def _registered_schema_keys(
+    registry: ToolRegistry,
+) -> Callable[[str], SchemaKeys | None]:
+    """The cached ``SchemaKeys`` of a registered tool (evidence labels, F-1)."""
+
+    def resolve(tool: str) -> SchemaKeys | None:
+        registered = registry.lookup(tool)
+        return None if registered is None else registered.schema_keys
+
+    return resolve
 
 
 def build_pipeline(
@@ -1044,11 +1116,15 @@ def build_pipeline(
 ) -> Pipeline:
     """Build a pipeline with one long-lived store, identity, guard and proxy.
 
+    ``detector`` defaults to the C-13 ``HeuristicDetector`` (OD-8).
+
     Raises:
         ConfigurationError: invalid configuration or audit store.
     """
     if type(config) is not SentinelConfig:
         raise ConfigurationError("config must be a SentinelConfig")
+    if detector is None:
+        detector = HeuristicDetector(schema_keys=_registered_schema_keys(registry))
     store = AuditStore(config.audit_db_path)
     try:
         return Pipeline(

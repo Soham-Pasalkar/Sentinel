@@ -63,6 +63,7 @@ def test_project_thresholds_are_the_approved_ones():
         "paths.py": 90,
         "audit.py": 90,
         "store.py": 90,
+        "detector.py": 90,  # C-13, OD-9 (owner 2026-11-18)
     }
     assert cc.OVERALL_THRESHOLD == 85
 
