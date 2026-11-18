@@ -70,6 +70,7 @@ Details: implementation plan rev. 24 (C-12).
 
 ## 3. Repository state (verified 2026-11-08; updated 2026-11-18)
 
+- **2026-11-18 (I-28 remediation):** before it, HEAD was `4946b027c137d60e4823215eee102301c394a3b5`, clean and in sync with the remote; the remediation commit is `0499de9` (CI in §4), followed by a documentation commit recording its CI run.
 - **2026-11-18:** before the remediation, HEAD was `2c37035c6dab7b23ca5c5e0173ff2b18285c85ed` (this note's earlier version), local and remote matched, and the working tree was clean. The remediation commit sits on top; see §4 for its CI run.
 
 - **Branch:** `c01-project-scaffold`. **HEAD:** `53955f9a47b3e6425fe55c2edb908e0aa3e1bfd4` (C-12), with the C-12 decision commit `1292974` directly below it. This checkpoint note is committed on top as documentation only.
@@ -83,7 +84,10 @@ Details: implementation plan rev. 24 (C-12).
 **I-28 remediation (2026-11-18), local (macOS, Python 3.11.14, project `.venv`):**
 - 1,207 passed, 1 xfailed (also with `RuntimeWarning` as an error); Ruff and format clean; `pip check` clean.
 - Branch coverage: `pipeline.py` 124/132 (93.94%), `proxy.py` 105/110 (95.45%), overall 640/660 (96.97%); NFR-006 check passed. The subprocess finalization tests are not measured by coverage.py.
-- **CI for the remediation commit:** to be recorded after the push. Python 3.12 and 3.13 are verified only by that run.
+- **CI for the remediation commit `0499de974d4019d79fa1bd2d157563c9b64efbc0`:** run [44288674120](https://github.com/Soham-Pasalkar/Sentinel/actions/runs/44288674120) (push event) tested exactly that SHA. All 7 jobs succeeded:
+  - Ruff: lint passed; format check passed (49 files).
+  - pytest on `ubuntu-latest` and `macos-latest` × Python 3.11, 3.12, 3.13: **1,207 passed, 1 xfailed** in each job; the six subprocess finalization tests ran and passed in every job (first execution of this design on 3.12 and 3.13).
+  - The NFR-006 gate passed in each job with the same figures as locally (`pipeline.py` 124/132, `proxy.py` 105/110, overall 640/660 = 96.97%).
 
 **C-12 remediation (2026-11-18), local (macOS, Python 3.11.14, project `.venv`):**
 - 1,058 passed, 1 xfailed (also with `RuntimeWarning` as an error); Ruff and format clean; `pip check` clean.

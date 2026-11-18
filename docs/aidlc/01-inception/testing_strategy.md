@@ -364,5 +364,5 @@ Owner decisions of 2026-11-18 (decision record §12, rev. 16): I-28, I-29 (K2), 
 
 **Coverage.** The subprocess tests are not measured by coverage.py, so the finalization branches count as uncovered even though they are tested; NFR-006 is met without them (`pipeline.py` and `proxy.py` above 90% branch coverage).
 
-**Cross-version evidence.** The suite has been run locally on Python 3.11 only. Python 3.12 and 3.13 results come only from CI on the exact pushed commit (`NEXT_SESSION.md` records the run).
+**Cross-version evidence.** Locally on Python 3.11 only. CI run 44288674120 on the exact commit `0499de9` passed on Python 3.11, 3.12 and 3.13 (ubuntu and macOS), including the six subprocess finalization tests in every job (`NEXT_SESSION.md` §4).
 
