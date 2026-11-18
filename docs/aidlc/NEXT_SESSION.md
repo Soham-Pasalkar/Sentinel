@@ -2,7 +2,7 @@
 
 Checkpoint of 2026-11-18, after the I-28 async-cancellation remediation of C-11 (before that: the C-12 independent review and remediation; first written 2026-11-08, after C-12). This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
 
-> **2026-11-18: development resumed by the owner for the C-12 remediation only.** That work is done (§2a). **Later on 2026-11-18 the owner approved the I-28 remediation decisions and authorized their implementation as C-11 remediation evidence for the G-M1 review** (decision record §12, rev. 16). That work is done (§2b). Gate **G-M1 is still not closed**: the owner's review of M1 is pending. I-28 and I-29 are Approved in their new wording; **I-24 to I-27 and I-30 to I-35 remain pending**. **C-13 must not begin until the owner closes G-M1.** No other implementation is authorized.
+> **2026-11-18: development resumed by the owner for the C-12 remediation only.** That work is done (§2a). **Later on 2026-11-18 the owner approved the I-28 remediation decisions and authorized their implementation as C-11 remediation evidence for the G-M1 review** (decision record §12, rev. 16). That work is done (§2b). **The owner then reviewed M1 (decision record §12, rev. 17): every interpretation I-1 to I-35 is now confirmed, and the owner approved closing G-M1 once this documentation correction passes CI.** Until that closure is recorded (§5), G-M1 is not yet closed. **C-13 stays blocked even after closure**: it needs D-24e, D-24h and the owner's review of the rule and severity table. No other implementation is authorized.
 
 ## 1. Purpose and architecture
 
@@ -70,10 +70,14 @@ Details: implementation plan rev. 24 (C-12).
 
 ## 3. Repository state (verified 2026-11-08; updated 2026-11-18)
 
+- **Current (2026-11-18, G-M1 review):** before this documentation correction, HEAD was `5072f20bd5144b8a616d074f5840340bb35ae803` (the I-28 CI record), clean and in sync with the remote, with CI run 44289005189 green on it. This correction is committed on top; its CI run is recorded in §4. Commits after it hold documentation only.
+
+*The bullets below are earlier checkpoints, kept as history; each names the HEAD at its own date.*
+
 - **2026-11-18 (I-28 remediation):** before it, HEAD was `4946b027c137d60e4823215eee102301c394a3b5`, clean and in sync with the remote; the remediation commit is `0499de9` (CI in §4), followed by a documentation commit recording its CI run.
 - **2026-11-18:** before the remediation, HEAD was `2c37035c6dab7b23ca5c5e0173ff2b18285c85ed` (this note's earlier version), local and remote matched, and the working tree was clean. The remediation commit sits on top; see §4 for its CI run.
 
-- **Branch:** `c01-project-scaffold`. **HEAD:** `53955f9a47b3e6425fe55c2edb908e0aa3e1bfd4` (C-12), with the C-12 decision commit `1292974` directly below it. This checkpoint note is committed on top as documentation only.
+- *2026-11-08 (historical):* **Branch:** `c01-project-scaffold`. **HEAD then:** `53955f9a47b3e6425fe55c2edb908e0aa3e1bfd4` (C-12), with the C-12 decision commit `1292974` directly below it. That checkpoint note was committed on top as documentation only.
 - **Remote:** `https://github.com/Soham-Pasalkar/Sentinel`, branch `c01-project-scaffold`; local and remote matched at `53955f9` before this checkpoint commit.
   - The repository is **public**.
   - GitHub made `c01-project-scaffold` the **default branch** (the repository was empty at the first push).
@@ -116,7 +120,7 @@ Details: implementation plan rev. 24 (C-12).
 
 **Local (macOS, Python 3.11.14, project `.venv`):** 991 passed, 1 xfailed (also with `RuntimeWarning` as an error); Ruff and format clean; `pip check` clean. The xfail is F15, the documented path race (`xfail(strict=True)`).
 
-**Per file:**
+**Per file (historical: the 991-test suite at the C-12 commit `53955f9`, 2026-11-08; not updated since. The current suite is 1,207 tests, see the I-28 remediation evidence above):**
 
 | Area | Files and tests |
 |---|---|
@@ -147,10 +151,10 @@ Details: implementation plan rev. 24 (C-12).
 | G-M1 item (implementation plan) | State (2026-11-18) |
 |---|---|
 | C-01 … C-12 complete | ✅ C-12 independently reviewed; FR-023 fixed. C-11 async lifecycle remediated (I-28, §2b), as evidence for the owner's review |
-| NFR-006 coverage met | ✅ locally and in CI run 44256518479 on `4e00c39` (all six test jobs); enforced in every test job |
-| README accurate | ✅ (updated in the remediation) |
+| NFR-006 coverage met | ✅ enforced in every CI test job; latest: run 44288674120 on `0499de9` (`pipeline.py` 93.94%, `proxy.py` 95.45%, overall 96.97%); earlier run 44256518479 on `4e00c39` |
+| README accurate | ✅ (updated in the C-12 remediation; interpretation status corrected in the G-M1 review, 2026-11-18) |
 | Threat model revisited | ✅ (rev. 12; T-19 and T-21 updated in rev. 14) |
-| Owner review before M2 | ❌ **pending**, including I-24 to I-27 and I-30 to I-35 (I-28 and I-29 Approved 2026-11-18) |
+| Owner review before M2 | ✅ **done 2026-11-18** (decision record §12, rev. 17): I-24 to I-27 and I-30 to I-35 confirmed; I-28 and I-29 Approved (rev. 16). Closure approved, effective once this documentation correction passes CI |
 
 mypy is not a G-M1 item (NFR-005 is a SHOULD and not in the gate); it stays unapproved.
 
@@ -178,10 +182,10 @@ mypy is not a G-M1 item (NFR-005 is a SHOULD and not in the gate); it stays unap
 
 **Interpretations** (decision record, under D-24):
 - I-1 to I-23: confirmed by the owner.
-- **I-24 to I-35: the owner was asked on 2026-11-18 and chose to keep all of them pending** (decision record §12, rev. 15). A resumption handover claimed I-24 to I-31 were confirmed during the C-11 review; §12 has no such record, so they are pending.
+- *Earlier on 2026-11-18 (rev. 15, historical):* the owner was asked about I-24 to I-35 and chose to keep all of them pending. A resumption handover had claimed I-24 to I-31 were confirmed during the C-11 review; §12 had no such record.
 - **2026-11-18 (rev. 16): I-28 and I-29 replaced and Approved by the owner** with the I-28 remediation decisions.
-- **I-24 to I-27, I-30 and I-31 (C-11): pending owner confirmation.**
-- **I-32 to I-35 (C-12): pending owner confirmation:**
+- **2026-11-18 (rev. 17, G-M1 review): I-24 to I-27, I-30 and I-31 (C-11) confirmed** (I-27, I-30 and I-31 with clarifications).
+- **2026-11-18 (rev. 17): I-32 to I-35 (C-12) confirmed** (I-34 with a clarification):
   - **I-32:** a non-mapping `raw` raises `TypeError`, unaudited;
   - **I-33:** the public export set;
   - **I-34:** `audit_events` validation, first-`limit` semantics, the `AuditEvent` shape;
@@ -191,10 +195,10 @@ mypy is not a G-M1 item (NFR-005 is a SHOULD and not in the gate); it stays unap
 
 *2026-11-08 list (items 1 and 3's coverage part done 2026-11-18):* independent review of C-12; D-22; close G-M1.
 
-1. **Owner review of M1:** confirm or amend I-24 to I-27 and I-30 to I-35, review the I-28 remediation evidence (§2b), and record G-M1 as closed (or name what remains).
+1. ~~Owner review of M1~~: **done 2026-11-18** (decision record §12, rev. 17). G-M1 closure is recorded in §5 once the documentation correction passes CI.
 2. Only then: **C-13**, which also needs D-24e, D-24h and the owner's review of the rule and severity table.
 
-**C-13 must not begin until G-M1 is closed.**
+**C-13 must not begin until G-M1 is closed and the owner has decided D-24e and D-24h and reviewed the rule and severity table.** Closing G-M1 does not authorize C-13.
 
 ## 8. Security constraints not to forget
 

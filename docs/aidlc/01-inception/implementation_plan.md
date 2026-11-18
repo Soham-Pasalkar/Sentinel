@@ -372,7 +372,7 @@
   - **Gate G-M1 after this remediation:** C-01 … C-12 complete and independently reviewed ✅; NFR-006 met and enforced ✅ (subject to CI); README accurate ✅; threat model revisited ✅. **Still open:** the owner's review of M1, including I-24 to I-35, which the owner kept pending. **M1 is not closed.**
 
 #### Gate G-M1
-C-01 … C-12 complete; NFR-006 coverage met; README accurate; threat model revisited; owner review before M2. *(Rev. 24: all met except the owner review; see C-12 above.)* *(Rev. 25: the I-28 remediation of C-11 is added to the M1 evidence for that review; it does not close the gate.)*
+C-01 … C-12 complete; NFR-006 coverage met; README accurate; threat model revisited; owner review before M2. *(Rev. 24: all met except the owner review; see C-12 above.)* *(Rev. 25: the I-28 remediation of C-11 is added to the M1 evidence for that review; it does not close the gate.)* *(Rev. 26, 2026-11-18: the owner's review of M1 is done: I-24 to I-27 and I-30 to I-35 confirmed, I-28 and I-29 Approved (decision record §12, revs. 16–17). The owner approved closing G-M1 once the documentation corrections of that review pass CI; the closure is recorded here when it does. C-13 stays blocked on D-24e, D-24h and the owner's review of the rule and severity table.)*
 
 ### C-13 — Detection heuristics (M2)
 Recursive argument scanning, injection and sensitive-data rules, benign corpus, alert manager. **Blocked by:** D-24e, D-24h, the owner's review of the rule and severity table. **Acceptance:** table-driven tests; measured corpus counts; documented evasion test. **Invariants:** SEC-012, SEC-020.
@@ -484,3 +484,4 @@ G-0 → C-01 → C-02 → C-02b (experiments: done)
 | 23 | C-12 implemented: `client.py`, public `__all__`, quickstart, README; 57 e2e tests; G-M1 open (coverage needs D-22; owner review) |
 | 24 | C-12 independent review and remediation: FR-023 quickstart, audit-row integrity, AT-30 guard test, pipeline fault-path tests, D-22 (coverage.py) and the NFR-006 gate in CI; G-M1 open only for the owner review (I-24 to I-35 pending) |
 | 25 | C-11 remediation (I-28 async cancellation lifecycle), authorized by the owner 2026-11-18 as G-M1 review evidence; G-M1 still open |
+| 26 | G-M1 owner review: I-24 to I-27 and I-30 to I-35 confirmed; documentation corrected (README, SEC-027, NEXT_SESSION); closure approved, effective once that correction passes CI |

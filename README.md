@@ -93,7 +93,7 @@ Everything in `sentinel.__all__` is public; every other module and name is inter
 | Rate limits (C-15) | **not implemented**: grants with a rate limit are refused |
 | Framework adapters, LangGraph and LangChain (C-16) | **not implemented**; design approved (D-12) |
 
-Milestone M1 is implemented and independently reviewed. Branch coverage is measured and enforced in CI (NFR-006). Its gate (G-M1) is **not yet closed**: the owner's review of M1 is still pending, including interpretations I-24 to I-35.
+Milestone M1 is implemented and independently reviewed. Branch coverage is measured and enforced in CI (NFR-006). The owner has reviewed M1 and confirmed every C-11 and C-12 interpretation (I-24 to I-35; I-28 and I-29 in their 2026-11-18 wording), and approved closing its gate (G-M1) once these documentation corrections pass CI. Closing G-M1 does not start M2: threat detection (C-13) still awaits further owner decisions.
 
 ## Known limitations
 
