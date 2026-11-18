@@ -86,7 +86,10 @@ Details: implementation plan rev. 24 (C-12).
   | `store.py` | 53/54 (98.15%) |
   | **Overall** | **576/594 (96.97%)** |
 
-- **CI for the remediation commit:** recorded below once its run finishes.
+- **CI for the remediation commit `4e00c39fa843389ac93e3f358d95c1e08411b079`:** run [44256518479](https://github.com/Soham-Pasalkar/Sentinel/actions/runs/44256518479) (push event) tested exactly that SHA. All 7 jobs succeeded:
+  - Ruff: lint passed; format check passed (45 files).
+  - pytest on `ubuntu-latest` and `macos-latest` × Python 3.11, 3.12, 3.13: **1,058 passed, 1 xfailed** in each job.
+  - The NFR-006 gate passed in each job with the same figures as locally (overall 576/594 = 96.97%; every guarded file ≥ 90%).
 
 **Checkpoint commit `2c37035`:** CI run [42477135779](https://github.com/Soham-Pasalkar/Sentinel/actions/runs/42477135779) tested exactly that SHA. Ruff passed, and all six pytest jobs passed with 991 passed, 1 xfailed each. *(The 2026-11-08 text below said the checkpoint push did not wait for CI; a run did happen.)*
 
@@ -127,7 +130,7 @@ Details: implementation plan rev. 24 (C-12).
 | G-M1 item (implementation plan) | State (2026-11-18) |
 |---|---|
 | C-01 … C-12 complete | ✅ C-12 independently reviewed; FR-023 fixed |
-| NFR-006 coverage met | ✅ locally (§4) and enforced in every CI test job; see §4 for CI |
+| NFR-006 coverage met | ✅ locally and in CI run 44256518479 on `4e00c39` (all six test jobs); enforced in every test job |
 | README accurate | ✅ (updated in the remediation) |
 | Threat model revisited | ✅ (rev. 12) |
 | Owner review before M2 | ❌ **pending**, including I-24 to I-35, which the owner chose to keep pending |
