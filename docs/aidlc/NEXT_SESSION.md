@@ -1,8 +1,8 @@
 # Sentinel — Project Checkpoint and Resume Note
 
-Checkpoint of 2026-11-18, after the I-28 async-cancellation remediation of C-11 (before that: the C-12 independent review and remediation; first written 2026-11-08, after C-12). This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
+Checkpoint of 2026-11-18, after the G-M1 owner review and closure (before that: the I-28 async-cancellation remediation of C-11; the C-12 independent review and remediation; first written 2026-11-08, after C-12). This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
 
-> **2026-11-18: development resumed by the owner for the C-12 remediation only.** That work is done (§2a). **Later on 2026-11-18 the owner approved the I-28 remediation decisions and authorized their implementation as C-11 remediation evidence for the G-M1 review** (decision record §12, rev. 16). That work is done (§2b). **The owner then reviewed M1 (decision record §12, rev. 17): every interpretation I-1 to I-35 is now confirmed, and the owner approved closing G-M1 once this documentation correction passes CI.** Until that closure is recorded (§5), G-M1 is not yet closed. **C-13 stays blocked even after closure**: it needs D-24e, D-24h and the owner's review of the rule and severity table. No other implementation is authorized.
+> **2026-11-18: development resumed by the owner for the C-12 remediation only.** That work is done (§2a). **Later on 2026-11-18 the owner approved the I-28 remediation decisions and authorized their implementation as C-11 remediation evidence for the G-M1 review** (decision record §12, rev. 16). That work is done (§2b). **The owner then reviewed M1 (decision record §12, rev. 17): every interpretation I-1 to I-35 is now confirmed. G-M1 is CLOSED (2026-11-18, §5)**, after the documentation correction `8300360` passed CI. **C-13 stays blocked even after closure**: it needs D-24e, D-24h and the owner's review of the rule and severity table. No other implementation is authorized.
 
 ## 1. Purpose and architecture
 
@@ -70,7 +70,7 @@ Details: implementation plan rev. 24 (C-12).
 
 ## 3. Repository state (verified 2026-11-08; updated 2026-11-18)
 
-- **Current (2026-11-18, G-M1 review):** before this documentation correction, HEAD was `5072f20bd5144b8a616d074f5840340bb35ae803` (the I-28 CI record), clean and in sync with the remote, with CI run 44289005189 green on it. This correction is committed on top; its CI run is recorded in §4. Commits after it hold documentation only.
+- **Current (2026-11-18, G-M1 review):** before this documentation correction, HEAD was `5072f20bd5144b8a616d074f5840340bb35ae803` (the I-28 CI record), clean and in sync with the remote, with CI run 44289005189 green on it. The correction is `8300360` (CI run [44291157573](https://github.com/Soham-Pasalkar/Sentinel/actions/runs/44291157573) on exactly `83003601ab625d5e686c3aff3a465cebeeb206b6`, green); the G-M1 closure record is committed on top of it. Both hold documentation only.
 
 *The bullets below are earlier checkpoints, kept as history; each names the HEAD at its own date.*
 
@@ -84,6 +84,8 @@ Details: implementation plan rev. 24 (C-12).
   - No `main` branch exists; nothing has been merged; no release has been made.
 
 ## 4. Test evidence
+
+**G-M1 documentation correction (2026-11-18):** CI run [44291157573](https://github.com/Soham-Pasalkar/Sentinel/actions/runs/44291157573) on exactly `83003601ab625d5e686c3aff3a465cebeeb206b6` (push event): all 7 jobs succeeded; Ruff passed (49 files); **1,207 passed, 1 xfailed** in each of the six test jobs (ubuntu and macOS × Python 3.11, 3.12, 3.13). This is the closure evidence for G-M1.
 
 **I-28 remediation (2026-11-18), local (macOS, Python 3.11.14, project `.venv`):**
 - 1,207 passed, 1 xfailed (also with `RuntimeWarning` as an error); Ruff and format clean; `pip check` clean.
@@ -146,7 +148,10 @@ Details: implementation plan rev. 24 (C-12).
 
 *2026-11-08:* "Not available: mypy (NFR-005) and coverage (NFR-006) output." **2026-11-18:** coverage is approved (D-22, coverage.py only) and measured; mypy is still not approved (NFR-005).
 
-## 5. Gate G-M1: NOT CLOSED
+## 5. Gate G-M1: CLOSED (2026-11-18)
+
+Closed by the owner's approval (decision record §12, rev. 17: "After the documentation corrections and successful CI verification, I approve closing G-M1."), effective once CI run [44291157573](https://github.com/Soham-Pasalkar/Sentinel/actions/runs/44291157573) on exactly `83003601ab625d5e686c3aff3a465cebeeb206b6` passed. Closing G-M1 does not authorize C-13.
+
 
 | G-M1 item (implementation plan) | State (2026-11-18) |
 |---|---|
@@ -154,7 +159,7 @@ Details: implementation plan rev. 24 (C-12).
 | NFR-006 coverage met | ✅ enforced in every CI test job; latest: run 44288674120 on `0499de9` (`pipeline.py` 93.94%, `proxy.py` 95.45%, overall 96.97%); earlier run 44256518479 on `4e00c39` |
 | README accurate | ✅ (updated in the C-12 remediation; interpretation status corrected in the G-M1 review, 2026-11-18) |
 | Threat model revisited | ✅ (rev. 12; T-19 and T-21 updated in rev. 14) |
-| Owner review before M2 | ✅ **done 2026-11-18** (decision record §12, rev. 17): I-24 to I-27 and I-30 to I-35 confirmed; I-28 and I-29 Approved (rev. 16). Closure approved, effective once this documentation correction passes CI |
+| Owner review before M2 | ✅ **done 2026-11-18** (decision record §12, rev. 17): I-24 to I-27 and I-30 to I-35 confirmed; I-28 and I-29 Approved (rev. 16). G-M1 closed 2026-11-18 after CI run 44291157573 on `8300360` |
 
 mypy is not a G-M1 item (NFR-005 is a SHOULD and not in the gate); it stays unapproved.
 
@@ -195,7 +200,7 @@ mypy is not a G-M1 item (NFR-005 is a SHOULD and not in the gate); it stays unap
 
 *2026-11-08 list (items 1 and 3's coverage part done 2026-11-18):* independent review of C-12; D-22; close G-M1.
 
-1. ~~Owner review of M1~~: **done 2026-11-18** (decision record §12, rev. 17). G-M1 closure is recorded in §5 once the documentation correction passes CI.
+1. ~~Owner review of M1~~: **done 2026-11-18** (decision record §12, rev. 17). **G-M1 closed 2026-11-18** (§5).
 2. Only then: **C-13**, which also needs D-24e, D-24h and the owner's review of the rule and severity table.
 
 **C-13 must not begin until G-M1 is closed and the owner has decided D-24e and D-24h and reviewed the rule and severity table.** Closing G-M1 does not authorize C-13.

@@ -1,6 +1,6 @@
 # Sentinel
 
-> **Status: pre-release (milestone M1 implemented, not yet signed off).** Sentinel authorizes, executes and audits tool calls routed through `SentinelClient`. Threat detection, output filtering, rate limits and framework adapters are **not implemented yet**. Do not rely on it as your only security control.
+> **Status: pre-release (milestone M1 implemented and signed off by the owner, 2026-11-18).** Sentinel authorizes, executes and audits tool calls routed through `SentinelClient`. Threat detection, output filtering, rate limits and framework adapters are **not implemented yet**. Do not rely on it as your only security control.
 
 Sentinel is a runtime security library for AI agent systems. It sits between agents and the tools they invoke and decides, for each tool call, whether that call may execute. A call that Sentinel denies, or that requires approval, never executes. Every step is recorded in a local audit log.
 
@@ -93,7 +93,7 @@ Everything in `sentinel.__all__` is public; every other module and name is inter
 | Rate limits (C-15) | **not implemented**: grants with a rate limit are refused |
 | Framework adapters, LangGraph and LangChain (C-16) | **not implemented**; design approved (D-12) |
 
-Milestone M1 is implemented and independently reviewed. Branch coverage is measured and enforced in CI (NFR-006). The owner has reviewed M1 and confirmed every C-11 and C-12 interpretation (I-24 to I-35; I-28 and I-29 in their 2026-11-18 wording), and approved closing its gate (G-M1) once these documentation corrections pass CI. Closing G-M1 does not start M2: threat detection (C-13) still awaits further owner decisions.
+Milestone M1 is implemented and independently reviewed. Branch coverage is measured and enforced in CI (NFR-006). The owner has reviewed M1 and confirmed every C-11 and C-12 interpretation (I-24 to I-35; I-28 and I-29 in their 2026-11-18 wording), and closed its gate (G-M1) on 2026-11-18. Closing G-M1 does not start M2: threat detection (C-13) still awaits further owner decisions.
 
 ## Known limitations
 

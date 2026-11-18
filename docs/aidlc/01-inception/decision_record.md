@@ -1376,7 +1376,7 @@ With these rows, I-28 and I-29 are Approved in their rev. 16 wording. I-24 to I-
 | 2026-11-18 | G-M1 closure | Approved, effective after the documentation corrections pass CI | "After the documentation corrections and successful CI verification, I approve closing G-M1." "Record the closure and its evidence in the authoritative project documents." | same |
 | 2026-11-18 | C-13 | Still blocked | "C-13 remains blocked. Closing G-M1 does not authorize C-13. It remains dependent on D-24e, D-24h, and my review of the rule and severity table." | same |
 
-With these rows, every interpretation I-1 to I-35 is confirmed. The G-M1 closure itself, with its CI evidence, is recorded in `implementation_plan.md` (Gate G-M1) and `NEXT_SESSION.md` once the CI run on the documentation commit has passed.
+With these rows, every interpretation I-1 to I-35 is confirmed. The G-M1 closure itself, with its CI evidence, is recorded in `implementation_plan.md` (Gate G-M1) and `NEXT_SESSION.md` once the CI run on the documentation commit has passed. **Closure recorded (2026-11-18):** the documentation commit `8300360` passed CI run 44291157573 (all 7 jobs) on exactly `83003601ab625d5e686c3aff3a465cebeeb206b6`; G-M1 is closed under the owner's approval above. C-13 remains blocked.
 
 ## 13. C-02/C-02b finalization (rev. 2): changes and commands
 
