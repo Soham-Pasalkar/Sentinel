@@ -1,8 +1,8 @@
 # Sentinel — Project Checkpoint and Resume Note
 
-Checkpoint of 2026-11-18, after the G-M1 owner review and closure (before that: the I-28 async-cancellation remediation of C-11; the C-12 independent review and remediation; first written 2026-11-08, after C-12). This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
+Checkpoint of 2026-11-18, after the C-13 / G-1 / G-3 commit `0864579` and its CI run (before that: the G-M1 owner review and closure; the I-28 async-cancellation remediation of C-11; the C-12 independent review and remediation; first written 2026-11-08, after C-12). This is a pointer, not a source of truth: the canonical register is [`01-inception/decision_record.md`](01-inception/decision_record.md), and the increment plan is [`01-inception/implementation_plan.md`](01-inception/implementation_plan.md). Where this note and those documents disagree, they win.
 
-> **2026-11-18: development resumed by the owner for the C-12 remediation only.** That work is done (§2a). **Later on 2026-11-18 the owner approved the I-28 remediation decisions and authorized their implementation as C-11 remediation evidence for the G-M1 review** (decision record §12, rev. 16). That work is done (§2b). **The owner then reviewed M1 (decision record §12, rev. 17): every interpretation I-1 to I-35 is now confirmed. G-M1 is CLOSED (2026-11-18, §5)**, after the documentation correction `8300360` passed CI. **The owner then decided C-13 (decision record §12, rev. 18: OD-1 to OD-10, PI-04 MEDIUM) and approved its implementation. C-13 is implemented in the working tree (§2c) and awaits the owner's commit/push decision.** No other implementation is authorized.
+> **2026-11-18: development resumed by the owner for the C-12 remediation only.** That work is done (§2a). **Later on 2026-11-18 the owner approved the I-28 remediation decisions and authorized their implementation as C-11 remediation evidence for the G-M1 review** (decision record §12, rev. 16). That work is done (§2b). **The owner then reviewed M1 (decision record §12, rev. 17): every interpretation I-1 to I-35 is now confirmed. G-M1 is CLOSED (2026-11-18, §5)**, after the documentation correction `8300360` passed CI. **The owner then decided C-13 (decision record §12, rev. 18: OD-1 to OD-10, PI-04 MEDIUM) and approved its implementation. C-13 is implemented (§2c), with the G-1 masking fix, the G-3 audit-confidentiality hardening and the F-1 evidence-label fix, all owner-approved, and committed as `0864579` (§2c, §4). The checkpoint is partially CI-verified: the macOS Python 3.12 and 3.13 jobs could not get a runner (§4).** G-2 is the open mandatory pre-release requirement (§2d). No other implementation is authorized.
 
 ## 1. Purpose and architecture
 
@@ -18,7 +18,7 @@ Sentinel is an in-process Python library that sits between AI agents and their t
 
 The pipeline (C-11) is the only audit writer. It commits every C4.3 event to SQLite (C-09) before the next stage runs, and maps outcomes to `PipelineResult` (C1.6). `audit_events` gives bounded, read-only access to the audit (D-17). Everything outside `sentinel.__all__` is internal, including the async pipeline entry (D-30).
 
-**Not implemented:** real output filtering (C-14), rate limits (C-15), framework adapters for LangGraph and LangChain (C-16), and release readiness (C-18).
+**Not implemented:** the G-2 request-size limit (a mandatory pre-release requirement, §2d), real output filtering (C-14), rate limits (C-15, FR-019) and the alert manager (C-15, FR-020), framework adapters for LangGraph and LangChain (C-16), and release readiness (C-18).
 
 ## 2. Increment status and commits
 
@@ -36,6 +36,7 @@ The pipeline (C-11) is the only audit writer. It commits every C4.3 event to SQL
 | C-10 execution proxy and `tool_call_id` guard | complete (narrow fix I-30 in C-11) | `708745d` |
 | C-11 pipeline (sync and internal async) | complete; **I-28 async lifecycle remediated 2026-11-18** (§2b) | `625970a` + I-28 remediation commit |
 | C-12 public client, quickstart, README | implemented `53955f9`; **independently reviewed and remediated 2026-11-18** (§2a) | `53955f9` + remediation commit |
+| C-13 heuristic detection, with G-1, G-3, F-1 (and F-2, F-3) | complete; **partially CI-verified** (macOS Python 3.12 and 3.13 not run, §4) | `0864579` |
 
 Decision and documentation commits, in order: `bde7265`, `6c1ef3e`, `f64c8f6`, `fb4be1b`, `0794336`, `7efb7f2`, `deab308`, `65a4550`, `5d6ce77`, `eebfcc4`, `1292974` (the C-12 decisions).
 
@@ -43,7 +44,13 @@ Decision and documentation commits, in order: `bde7265`, `6c1ef3e`, `f64c8f6`, `
 
 **Decisions** (decision record §12, rev. 18): D-24e corrected (detector failure is `INTERNAL_ERROR`, never DENY), D-24h (advisory wording), the 16-rule catalogue plus `SC-01` (PI-04 MEDIUM by the owner's answer), `SCAN_INCOMPLETE` (`CRITICAL`, always denied), limits 32 / 10,000 / 1,000,000, coarse public codes, FR-020 moved to C-15, the heuristic detector as the client default, `detector.py` at ≥90% branch coverage, the amended T-04 test plan.
 
-**Implemented** (`detector.py`; one-line default in `build_pipeline`; the coverage script): 254 new tests (testing strategy §17), including a dictionary preflight added in the pre-commit review (oversized dictionaries are rejected before their keys are sorted); corpus 400 benign (0 blocked), 165 malicious (all detected, 90 blocked), 26 documented evasions (0 blocked); 39 of 39 mutants killed. Locally on Python 3.11.14: 1,461 passed, 1 xfailed; `detector.py` 98.89%, overall 97.07% branch coverage. **G-1 (owner-authorized):** the audit-masking JWT pattern was quadratic on crafted text (reachable before validation); it is now linear and masks a superset; all seven patterns reviewed (testing strategy §18). **G-2 (open, pre-release):** no request-size ceiling before the detector (threat model T-22; implementation plan rev. 29). **G-3 (owner-approved and implemented, uncommitted):** the audit no longer stores tool-argument keys or values, path strings or `tool_call_id`; REQUEST_RECEIVED keeps bounded structural metadata; identifier and tool-name rules; bounded schema keys; action-digest disclosure; older databases documented, not sanitised (decision record rev. 20; testing strategy §19). **F-1 (owner-approved remediation of the G-3 review finding):** FINDING evidence now names a top-level argument only by the registered schema's label, otherwise by position, so a schema that accepts undeclared keys can no longer put a request-supplied key in the audit; F-2 documentation and the F-3 canary extension done (decision record rev. 21; testing strategy §19.1). Locally on Python 3.11.14: 1,632 passed, 1 xfailed; `detector.py` 98.91%, `audit_shape.py` 92.71%, overall 96.55% branch coverage; 18 of 18 F-1 mutants caught. **Not yet committed or run in CI** (commit and push not authorized). Details: implementation plan revs. 28–31.
+**Implemented** (`detector.py`; one-line default in `build_pipeline`; the coverage script): 254 new tests (testing strategy §17), including a dictionary preflight added in the pre-commit review (oversized dictionaries are rejected before their keys are sorted); corpus 400 benign (0 blocked), 165 malicious (all detected, 90 blocked), 26 documented evasions (0 blocked); 39 of 39 mutants killed. Locally on Python 3.11.14: 1,461 passed, 1 xfailed; `detector.py` 98.89%, overall 97.07% branch coverage. **G-1 (owner-authorized):** the audit-masking JWT pattern was quadratic on crafted text (reachable before validation); it is now linear and masks a superset; all seven patterns reviewed (testing strategy §18). **G-2 (open, pre-release):** no request-size ceiling before the detector (threat model T-22; implementation plan rev. 29). **G-3 (owner-approved and implemented; committed in `0864579`):** the audit no longer stores tool-argument keys or values, path strings or `tool_call_id`; REQUEST_RECEIVED keeps bounded structural metadata; identifier and tool-name rules; bounded schema keys; action-digest disclosure; older databases documented, not sanitised (decision record rev. 20; testing strategy §19). **F-1 (owner-approved remediation of the G-3 review finding):** FINDING evidence now names a top-level argument only by the registered schema's label, otherwise by position, so a schema that accepts undeclared keys can no longer put a request-supplied key in the audit; F-2 documentation and the F-3 canary extension done (decision record rev. 21; testing strategy §19.1). Locally on Python 3.11.14: 1,632 passed, 1 xfailed; `detector.py` 98.91%, `audit_shape.py` 92.71%, overall 96.55% branch coverage; 18 of 18 F-1 mutants caught. **Committed** as `0864579` with the owner's authorization; CI evidence in §4 (partially verified). Details: implementation plan revs. 28–32.
+
+### 2d. Release boundary (2026-11-18)
+
+**G-2 (mandatory pre-release requirement, not started):** there is no request-size limit before the expensive request processing: REQUEST_RECEIVED masking, schema validation and canonical action encoding handle the whole request before the detector's limits apply (threat model T-22; implementation plan, G-2). It needs its own owner-approved change and is separate from the completed C-13 / G-1 / G-3 work. Sentinel is **not release-ready**.
+
+**Outstanding planned work:** C-14 (output filtering), C-15 (rate limits, FR-019; and the alert manager, FR-020), C-16 (framework adapters), then C-18 (release readiness). These are planned increments; not all of them are prerequisites for the next development checkpoint, and none has a scheduled date.
 
 ### 2a. C-12 independent review and remediation (2026-11-18)
 
@@ -76,7 +83,8 @@ Details: implementation plan rev. 24 (C-12).
 
 ## 3. Repository state (verified 2026-11-08; updated 2026-11-18)
 
-- **Current (2026-11-18, G-M1 review):** before this documentation correction, HEAD was `5072f20bd5144b8a616d074f5840340bb35ae803` (the I-28 CI record), clean and in sync with the remote, with CI run 44289005189 green on it. The correction is `8300360` (CI run [44291157573](https://github.com/Soham-Pasalkar/Sentinel/actions/runs/44291157573) on exactly `83003601ab625d5e686c3aff3a465cebeeb206b6`, green); the G-M1 closure record is committed on top of it. Both hold documentation only.
+- **Current (2026-11-18, C-13 / G-1 / G-3):** before the commit, HEAD was `31956145e559a306516bb716a826463515b14d39` (the G-M1 closure record), clean and in sync with the remote. The implementation commit is `086457950e450606aafad2e396a89c270a657c26` (29 files: code, tests and documentation), pushed normally; a documentation commit recording its CI run sits on top.
+- **2026-11-18 (G-M1 review):** before this documentation correction, HEAD was `5072f20bd5144b8a616d074f5840340bb35ae803` (the I-28 CI record), clean and in sync with the remote, with CI run 44289005189 green on it. The correction is `8300360` (CI run [44291157573](https://github.com/Soham-Pasalkar/Sentinel/actions/runs/44291157573) on exactly `83003601ab625d5e686c3aff3a465cebeeb206b6`, green); the G-M1 closure record is committed on top of it. Both hold documentation only.
 
 *The bullets below are earlier checkpoints, kept as history; each names the HEAD at its own date.*
 
@@ -90,6 +98,14 @@ Details: implementation plan rev. 24 (C-12).
   - No `main` branch exists; nothing has been merged; no release has been made.
 
 ## 4. Test evidence
+
+**C-13 / G-1 / G-3 commit (2026-11-18): partially CI-verified.** CI run [44355443564](https://github.com/Soham-Pasalkar/Sentinel/actions/runs/44355443564) (push event) on exactly `086457950e450606aafad2e396a89c270a657c26`:
+- Ruff: lint passed; format check passed (60 files).
+- pytest on `ubuntu-latest` × Python 3.11, 3.12, 3.13 and on `macos-latest` × Python 3.11: **1,632 passed, 1 xfailed** in each job; the NFR-006 gate passed in each with the local figures (overall 840/870 = 96.55%; `detector.py` 98.91%, `pipeline.py` 93.84%, `audit_shape.py` 92.71%).
+- pytest on `macos-latest` × Python 3.12 and 3.13: **not run.** Both jobs were cancelled after 15 minutes with no step executed ("The job was not acquired by Runner of type hosted even after multiple attempts"; GitHub reported macOS arm64 capacity constraints), on the first attempt and again on the owner-authorized rerun of the failed jobs (attempt 2). This is unavailable CI infrastructure, not a test failure, but these two configurations are **unverified** for this commit. The run's overall conclusion is therefore `failure`.
+- Verified for this commit: Linux on Python 3.11, 3.12, 3.13; macOS on Python 3.11 (CI) and 3.11.14 (local). Not verified: macOS on Python 3.12 and 3.13.
+
+**C-13 / G-1 / G-3, local (macOS, Python 3.11.14, project `.venv`):** 1,632 passed, 1 xfailed (also with `RuntimeWarning` as an error); Ruff and format clean; `pip check` clean; same coverage figures as CI.
 
 **G-M1 documentation correction (2026-11-18):** CI run [44291157573](https://github.com/Soham-Pasalkar/Sentinel/actions/runs/44291157573) on exactly `83003601ab625d5e686c3aff3a465cebeeb206b6` (push event): all 7 jobs succeeded; Ruff passed (49 files); **1,207 passed, 1 xfailed** in each of the six test jobs (ubuntu and macOS × Python 3.11, 3.12, 3.13). This is the closure evidence for G-M1.
 
